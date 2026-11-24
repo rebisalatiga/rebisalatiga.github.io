@@ -36,6 +36,17 @@ create unique index if not exists evaluations_unique_unit_subject_per_evaluator
   on public.evaluations(period_id, evaluator_membership_id, subject_unit_id)
   where subject_unit_id is not null;
 
+create index if not exists evaluations_subject_roster_id_idx
+  on public.evaluations(subject_roster_id)
+  where subject_roster_id is not null;
+
+create index if not exists member_roster_linked_user_id_idx
+  on public.member_roster(linked_user_id)
+  where linked_user_id is not null;
+
+create index if not exists member_roster_unit_id_idx
+  on public.member_roster(unit_id);
+
 -- 2) Authorization hierarchy:
 -- Ketua Rayon/Admin: all units.
 -- Kepala Bidang: its field and all descendant bureaus.
@@ -424,5 +435,25 @@ comment on view public.public_organization_structure is
 
 revoke all on public.public_organization_structure from public;
 grant select on public.public_organization_structure to anon, authenticated;
+
+
+-- Consolidate authenticated profile SELECT rules into one policy.
+drop policy if exists profiles_select_pending_for_approvers on public.profiles;
+drop policy if exists profiles_select_self_or_visible_org on public.profiles;
+drop policy if exists profiles_select_authorized on public.profiles;
+
+create policy profiles_select_authorized
+on public.profiles
+for select
+to authenticated
+using (
+  id = (select auth.uid())
+  or private.is_system_admin()
+  or private.can_view_user(profiles.id)
+  or (
+    account_status = 'pending'::public.account_status
+    and private.can_approve_accounts()
+  )
+);
 
 commit;
