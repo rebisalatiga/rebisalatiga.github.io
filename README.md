@@ -19,7 +19,7 @@ SIGAP membantu pengurus mengelola struktur rayon, bidang, biro, keanggotaan, per
 - Data anggota nominal dapat dicatat oleh pimpinan unit tanpa anggota harus mendaftar atau memiliki akun SIGAP.
 - Penilaian dan evaluasi dapat ditulis untuk anggota nominal, lengkap dengan cetak rapor per orang.
 - Penilaian kinerja biro sebagai satu unit, termasuk cetak rapor biro.
-- Direktori struktur organisasi publik yang menampilkan nama dan jabatan tanpa membuka penilaian, evaluasi, email, atau NIM. Akses langsung: [Direktori struktur publik](https://rebisalatiga.github.io/?struktur).
+- Direktori struktur organisasi publik berbentuk bagan kotak dan garis penghubung, terbuka untuk pengunjung tanpa akun maupun pengguna yang sedang login. Bagan susunan pengurus masa khidmat 2026/2027 memuat 73 nama; penilaian dan evaluasi tetap privat sesuai lingkup jabatan. Akses langsung: [Direktori struktur publik](https://rebisalatiga.github.io/?struktur).
 - Batas akses penilaian: Ketua Rayon seluruh unit; Kepala Bidang bidang dan semua biro di bawahnya (termasuk melihat penilaian Sekretaris Bidang); Sekretaris Bidang biro di bawahnya; Koordinator Biro hanya biro sendiri.
 - Periode kepengurusan.
 - Penilaian dengan enam indikator berbobot dan skala 1–5.
@@ -56,4 +56,4 @@ Pengaturan GitHub Pages:
 
 Publishable key boleh berada di frontend. **Jangan pernah** meletakkan Supabase service-role key atau secret key di repository frontend. Seluruh tabel aplikasi dilindungi RLS; pemberian role dilakukan melalui database oleh admin.
 
-Lihat dokumentasi Supabase untuk [Row Level Security](https://supabase.com/docs/guides/database/postgres/row-level-security). Skema terbaru untuk struktur publik, penilaian biro, dan pembatasan lingkup jabatan didokumentasikan di [supabase/03_public_structure_bureau_scoring_hierarchy.sql](supabase/03_public_structure_bureau_scoring_hierarchy.sql).
+Lihat dokumentasi Supabase untuk [Row Level Security](https://supabase.com/docs/guides/database/postgres/row-level-security). Skema terbaru untuk struktur publik, penilaian biro, dan pembatasan lingkup jabatan didokumentasikan di [supabase/03_public_structure_bureau_scoring_hierarchy.sql](supabase/03_public_structure_bureau_scoring_hierarchy.sql). Daftar pengurus 2026/2027 disimpan pada [supabase/04_seed_pengurus_2026_2027.sql](supabase/04_seed_pengurus_2026_2027.sql).
