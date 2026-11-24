@@ -31,7 +31,7 @@ async function authRequest(path, options={}, token=null) {
   return payload;
 }
 async function api(path, options={}) {
-  const response=await fetch(API+"/rest/v1/"+path,{
+  const request=()=>fetch(API+"/rest/v1/"+path,{
     ...options,
     headers:{
       ...authHeaders(state.session?.access_token),
@@ -40,6 +40,11 @@ async function api(path, options={}) {
       ...(options.headers||{})
     }
   });
+  let response=await request();
+  if(response.status===401 && state.session?.refresh_token) {
+    try { if(await refreshSession()) response=await request(); }
+    catch(_) { saveSession(null); }
+  }
   const payload=await response.json().catch(()=>null);
   if(!response.ok) {
     const message=payload?.message || payload?.details || payload?.hint || payload?.error_description || "Permintaan database gagal ("+response.status+").";
@@ -112,7 +117,7 @@ function renderAuth() {
     '<div class="hero-copy"><div class="eyebrow">Bergerak · Berproses · Bertumbuh</div><h1>Merawat amanah.<br>Menumbuhkan gerakan.</h1><p>Ruang digital pengurus PMII Fakultas Ekonomi dan Bisnis Islam untuk mengelola struktur, mengukur kinerja, dan menyusun evaluasi bersama.</p></div>'+
     '<div class="hero-foot">PERGERAKAN MAHASISWA ISLAM INDONESIA · PMII FEBI</div></section>'+
     '<section class="auth-panel"><form class="auth-card" id="auth-form"><div class="eyebrow">Ruang internal organisasi</div><h2>'+(signup?"Buat akun pengurus":"Selamat datang kembali")+'</h2><p>'+(signup?"Daftarkan akun. Admin rayon akan memeriksa dan menetapkan jabatan Anda.":"Masuk untuk melanjutkan proses dan amanah kepengurusan.")+'</p>'+
-    (signup?'<div class="field"><label>Nama lengkap</label><input name="full_name" required maxlength="100" placeholder="Nama sesuai identitas"></div>':'')+
+    (signup?'<div class="field"><label>Nama lengkap</label><input name="full_name" required maxlength="100" placeholder="Nama sesuai identitas"></div><div class="field"><label>NIM (opsional)</label><input name="nim" maxlength="40" placeholder="Nomor Induk Mahasiswa"></div><div class="field"><label>Angkatan (opsional)</label><input name="cohort" maxlength="20" placeholder="Contoh: 2024"></div>':'')+
     '<div class="field"><label>Email</label><input name="email" type="email" required autocomplete="email" placeholder="nama@email.com"></div>'+
     '<div class="field"><label>Password</label><input name="password" type="password" required minlength="8" autocomplete="'+(signup?"new-password":"current-password")+'" placeholder="Minimal 8 karakter"></div>'+
     '<button class="btn btn-block" type="submit">'+(signup?"Daftar akun":"Masuk ke SIGAP")+'</button>'+
@@ -197,7 +202,8 @@ function renderEvaluationCard(e) {
   let weighted=0,weightTotal=0;
   for(const s of values){const c=state.criteria.find(x=>x.id===s.criterion_id);if(c){weighted+=Number(s.score)*Number(c.weight);weightTotal+=Number(c.weight);}}
   const score=weightTotal?(weighted/weightTotal*20).toFixed(1):"—";
-  return '<article class="eval-card"><div class="eval-meta"><div><h4>'+esc(target?memberName(target):"Pengurus")+'</h4><div class="tiny muted">'+esc(target?unitName(target):"")+' · Dinilai oleh '+esc(evaluator?memberName(evaluator):"Pengurus")+'</div></div><span class="badge '+(e.status==="submitted"?"gold":e.status==="reviewed"?"":"grey")+'">'+esc(e.status==="submitted"?"Terkirim":e.status==="reviewed"?"Ditinjau":"Draft")+'</span></div><p>'+esc(e.strengths||"Belum ada catatan kekuatan.")+'</p><div class="small"><strong>Nilai akhir: '+score+(score==="—"?"":" / 100")+'</strong> <span class="muted">· '+dateText(e.created_at)+'</span></div></article>';
+  const reviewAction=isAdmin()&&e.status==="submitted" ? '<div style="margin-top:12px"><button class="btn btn-ghost" data-review-evaluation="'+e.id+'">Tandai sudah ditinjau</button></div>' : "";
+  return '<article class="eval-card"><div class="eval-meta"><div><h4>'+esc(target?memberName(target):"Pengurus")+'</h4><div class="tiny muted">'+esc(target?unitName(target):"")+' · Dinilai oleh '+esc(evaluator?memberName(evaluator):"Pengurus")+'</div></div><span class="badge '+(e.status==="submitted"?"gold":e.status==="reviewed"?"":"grey")+'">'+esc(e.status==="submitted"?"Terkirim":e.status==="reviewed"?"Ditinjau":"Draft")+'</span></div><p>'+esc(e.strengths||"Belum ada catatan kekuatan.")+'</p><div class="small"><strong>Nilai akhir: '+score+(score==="—"?"":" / 100")+'</strong> <span class="muted">· '+dateText(e.created_at)+'</span></div><div class="tiny muted" style="margin-top:7px">Perbaikan: '+esc(e.improvements||"—")+' · Kendala: '+esc(e.obstacles||"—")+' · Rekomendasi: '+esc(e.recommendations||"—")+'</div>'+reviewAction+'</article>';
 }
 function renderEvaluations() {
   const p=periodActive();
@@ -216,18 +222,47 @@ function renderEvaluations() {
 }
 function renderReportCard(r) {
   const unit=unitFor(r.unit_id);
-  return '<article class="report-card"><div class="eval-meta"><div><h4>'+esc(r.title)+'</h4><div class="tiny muted">'+esc(unit?.name||"Unit")+' · '+dateText(r.activity_date||r.created_at)+'</div></div><span class="badge '+(r.status==="approved"?"":"gold")+'">'+esc(({draft:"Draft",submitted:"Terkirim",approved:"Disetujui",revision_requested:"Perlu revisi"})[r.status]||r.status)+'</span></div><p>'+esc(r.description||"Tidak ada deskripsi.")+'</p><div class="tiny muted">Target: '+esc(r.target||"—")+' · Realisasi: '+esc(r.realization||"—")+'</div></article>';
+  const owner=state.memberships.find(m=>m.id===r.created_by_membership_id);
+  const canEdit=r.status==="draft" && owner?.user_id===state.user?.id;
+  const evidence=r.evidence_url?'<a class="tiny" href="'+esc(r.evidence_url)+'" target="_blank" rel="noopener">Buka bukti kegiatan ↗</a>':"";
+  return '<article class="report-card"><div class="eval-meta"><div><h4>'+esc(r.title)+'</h4><div class="tiny muted">'+esc(unit?.name||"Unit")+' · '+dateText(r.activity_date||r.created_at)+'</div></div><span class="badge '+(r.status==="approved"?"":"gold")+'">'+esc(({draft:"Draft",submitted:"Terkirim",approved:"Disetujui",revision_requested:"Perlu revisi"})[r.status]||r.status)+'</span></div><p>'+esc(r.description||"Tidak ada deskripsi.")+'</p><div class="tiny muted">Target: '+esc(r.target||"—")+' · Realisasi: '+esc(r.realization||"—")+'</div><div class="row between" style="margin-top:10px">'+evidence+(canEdit?'<button class="btn btn-ghost" data-edit-report="'+r.id+'">Edit draft</button>':'')+'</div></article>';
 }
 function renderReports() {
   const p=periodActive();
   if(!p) return pageHeading("Laporan kegiatan","Dokumentasikan program kerja, target, realisasi, dan bukti kegiatan.")+'<div class="empty"><strong>Belum ada periode kepengurusan</strong>Admin perlu membuat periode aktif terlebih dahulu.</div>';
   const mine=ownMemberships().filter(m=>m.period_id===p.id);
-  const own=mine[0];
   const reports=state.reports.filter(r=>r.period_id===p.id);
+  const membershipOptions=mine.map(m=>'<option value="'+m.id+'">'+esc(unitName(m))+' · '+esc(roleLabels[m.role]||m.role)+'</option>').join("");
   return pageHeading("Laporan kegiatan","Dokumentasikan program kerja, target, realisasi, dan bukti kegiatan.")+
-    '<div class="split"><section class="panel"><div class="panel-head"><div><h3>Tambah laporan kegiatan</h3><p>Laporan akan tercatat pada unit jabatan Anda.</p></div></div>'+
-    (own?'<form id="report-form"><div class="field"><label>Judul kegiatan / laporan</label><input name="title" required maxlength="140" placeholder="Nama kegiatan atau progres kerja"></div><div class="field"><label>Deskripsi</label><textarea name="description" placeholder="Ringkasan kegiatan…"></textarea></div><div class="field"><label>Target</label><textarea name="target" placeholder="Target yang direncanakan…"></textarea></div><div class="field"><label>Realisasi</label><textarea name="realization" placeholder="Hasil yang telah dicapai…"></textarea></div><div class="form-grid"><div class="field"><label>Tanggal rencana</label><input name="planned_date" type="date"></div><div class="field"><label>Tanggal kegiatan</label><input name="activity_date" type="date"></div></div><div class="field"><label>Tautan bukti / dokumentasi</label><input name="evidence_url" type="url" placeholder="https://…"></div><div class="form-actions"><button class="btn" type="submit">Simpan laporan</button></div></form>':'<div class="empty"><strong>Penugasan belum tersedia</strong>Admin perlu menetapkan jabatan Anda pada periode ini.</div>')+
+    '<div class="split"><section class="panel"><div class="panel-head"><div><h3>Tambah laporan kegiatan</h3><p>Pilih unit yang melaksanakan kegiatan.</p></div></div>'+
+    (mine.length?'<form id="report-form"><div class="field"><label>Unit pelaksana</label><select name="membership_id" required>'+membershipOptions+'</select></div><div class="field"><label>Judul kegiatan / laporan</label><input name="title" required maxlength="140" placeholder="Nama kegiatan atau progres kerja"></div><div class="field"><label>Deskripsi</label><textarea name="description" placeholder="Ringkasan kegiatan…"></textarea></div><div class="field"><label>Target</label><textarea name="target" placeholder="Target yang direncanakan…"></textarea></div><div class="field"><label>Realisasi</label><textarea name="realization" placeholder="Hasil yang telah dicapai…"></textarea></div><div class="form-grid"><div class="field"><label>Tanggal rencana</label><input name="planned_date" type="date"></div><div class="field"><label>Tanggal kegiatan</label><input name="activity_date" type="date"></div></div><div class="field"><label>Tautan bukti / dokumentasi</label><input name="evidence_url" type="url" placeholder="https://…"></div><div class="form-actions"><button class="btn" type="submit">Simpan laporan</button></div></form>':'<div class="empty"><strong>Penugasan belum tersedia</strong>Admin perlu menetapkan jabatan Anda pada periode ini.</div>')+
     '</section><section class="panel"><div class="panel-head"><div><h3>Arsip laporan</h3><p>'+reports.length+' laporan pada periode terpilih</p></div></div><div class="report-list">'+(reports.length?reports.map(renderReportCard).join(""):'<div class="empty"><strong>Belum ada laporan</strong>Catatan kegiatan akan tampil di sini.</div>')+'</div></section></div>';
+}
+function openReportEditor(id) {
+  const report=state.reports.find(r=>r.id===id);
+  if(!report || report.status!=="draft") return;
+  const owner=state.memberships.find(m=>m.id===report.created_by_membership_id);
+  if(owner?.user_id!==state.user?.id) return;
+  const field=(label,name,value,type="text")=>'<div class="field"><label>'+label+'</label><input name="'+name+'" type="'+type+'" value="'+esc(value||"")+'"></div>';
+  const overlay=document.createElement("div");
+  overlay.className="modal-backdrop";
+  overlay.innerHTML='<form class="modal" id="edit-report-form"><div class="row between"><h3>Edit laporan kegiatan</h3><button type="button" class="btn btn-ghost" id="close-edit-report">Tutup</button></div>'+field("Judul kegiatan","title",report.title)+'<div class="field"><label>Deskripsi</label><textarea name="description">'+esc(report.description||"")+'</textarea></div><div class="field"><label>Target</label><textarea name="target">'+esc(report.target||"")+'</textarea></div><div class="field"><label>Realisasi</label><textarea name="realization">'+esc(report.realization||"")+'</textarea></div><div class="form-grid">'+field("Tanggal rencana","planned_date",report.planned_date,"date")+field("Tanggal kegiatan","activity_date",report.activity_date,"date")+'</div>'+field("Tautan bukti","evidence_url",report.evidence_url,"url")+'<div class="form-actions"><button class="btn" type="submit">Simpan perubahan</button></div></form>';
+  document.body.appendChild(overlay);
+  overlay.addEventListener("click",e=>{if(e.target===overlay)overlay.remove();});
+  $("#close-edit-report",overlay).addEventListener("click",()=>overlay.remove());
+  $("#edit-report-form",overlay).addEventListener("submit",async e=>{
+    e.preventDefault();
+    const values=Object.fromEntries(new FormData(e.currentTarget).entries());
+    const submit=e.currentTarget.querySelector('button[type="submit"]');submit.disabled=true;
+    try {
+      await api("activity_reports?id=eq."+encodeURIComponent(id),{method:"PATCH",body:JSON.stringify({
+        title:values.title,description:values.description||null,target:values.target||null,
+        realization:values.realization||null,planned_date:values.planned_date||null,
+        activity_date:values.activity_date||null,evidence_url:values.evidence_url||null
+      })});
+      overlay.remove();toast("Laporan berhasil diperbarui.");await loadData();renderShell();
+    } catch(error) {toast(error.message,true);submit.disabled=false;}
+  });
 }
 function renderAdmin() {
   const pending=state.profiles.filter(p=>p.account_status==="pending");
@@ -270,7 +305,7 @@ async function handleAuth(form) {
   const values=Object.fromEntries(new FormData(form).entries());
   const signup=state.authMode==="signup";
   const path=signup?"/signup":"/token?grant_type=password";
-  const body=signup?{email:values.email,password:values.password,data:{full_name:values.full_name}}:{email:values.email,password:values.password};
+  const body=signup?{email:values.email,password:values.password,data:{full_name:values.full_name,nim:values.nim||null,cohort:values.cohort||null}}:{email:values.email,password:values.password};
   const result=await authRequest(path,{method:"POST",body:JSON.stringify(body)});
   if(signup && !result.access_token) {
     state.authMode="login"; renderAuth();
@@ -303,15 +338,15 @@ async function submitEvaluation(form) {
 }
 async function submitReport(form) {
   const values=Object.fromEntries(new FormData(form).entries());
-  const p=periodActive(); const own=ownMemberships().find(m=>p && m.period_id===p.id);
-  if(!own) throw new Error("Penugasan Anda pada periode ini belum tersedia.");
+  const p=periodActive(); const own=ownMemberships().find(m=>m.id===values.membership_id && p && m.period_id===p.id);
+  if(!own) throw new Error("Pilih penugasan yang aktif pada periode ini.");
   await api("activity_reports",{method:"POST",body:JSON.stringify({
     period_id:p.id,created_by_membership_id:own.id,unit_id:own.unit_id,title:values.title,
     description:values.description||null,target:values.target||null,realization:values.realization||null,
     planned_date:values.planned_date||null,activity_date:values.activity_date||null,
     evidence_url:values.evidence_url||null,status:"draft"
   })});
-  toast("Laporan kegiatan berhasil disimpan.");
+  toast("Laporan kegiatan berhasil disimpan sebagai draft. Anda masih dapat mengeditnya.");
   await loadData(); state.view="reports"; render();
 }
 async function createPeriod(form) {
@@ -359,6 +394,10 @@ document.addEventListener("click",async event=>{
   if(event.target.closest("#mobile-menu")){$("#sidebar")?.classList.toggle("open");return;}
   const approve=event.target.closest("[data-approve]");
   if(approve){approve.disabled=true;try{await api("profiles?id=eq."+approve.dataset.approve,{method:"PATCH",body:JSON.stringify({account_status:"active"})});toast("Akun disetujui. Tetapkan jabatan pada formulir penempatan.");await loadData();renderShell();}catch(e){toast(e.message,true);approve.disabled=false;}return;}
+  const review=event.target.closest("[data-review-evaluation]");
+  if(review){review.disabled=true;try{await api("evaluations?id=eq."+review.dataset.reviewEvaluation,{method:"PATCH",body:JSON.stringify({status:"reviewed",reviewed_at:new Date().toISOString()})});toast("Penilaian telah ditandai ditinjau.");await loadData();renderShell();}catch(e){toast(e.message,true);review.disabled=false;}return;}
+  const editReport=event.target.closest("[data-edit-report]");
+  if(editReport){openReportEditor(editReport.dataset.editReport);return;}
   const activate=event.target.closest("[data-set-active]");
   if(activate){activate.disabled=true;try{await activatePeriod(activate.dataset.setActive);}catch(e){toast(e.message,true);activate.disabled=false;}return;}
 });
