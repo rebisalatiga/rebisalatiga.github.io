@@ -148,6 +148,7 @@ function renderAuth() {
   const signup=state.authMode==="signup";
   root.innerHTML='<div class="auth-layout">'+
     '<section class="auth-hero"><div class="brand-lockup"><div class="brand-logo auth-logo"><img src="https://1.bp.blogspot.com/-_LPIjxug5bs/W1YpWUAw0FI/AAAAAAAAAac/26D9u4GoFe0qM9sdOUpfSyV0MH4RO1y0QCLcBGAs/s1600/logo_pmii_hd.png" alt="Logo PMII Rayon Ekonomi Bisnis Islam"></div><div><strong>SIGAP PMII FEBI</strong><small>Sistem Informasi Evaluasi Kepengurusan</small></div></div>'+
+    '<div class="auth-structure-action"><button class="auth-structure-button" type="button" id="public-structure"><span class="auth-structure-icon">⌘</span><span class="auth-structure-copy"><strong>Lihat Struktur Organisasi</strong><small>Bagan publik · dapat dilihat tanpa masuk</small></span><span class="auth-structure-arrow">↗</span></button></div>'+
     '<div class="hero-copy"><div class="eyebrow">Bergerak · Berproses · Bertumbuh</div><h1>Merawat amanah.<br>Menumbuhkan gerakan.</h1><p>Ruang digital pengurus PMII Fakultas Ekonomi dan Bisnis Islam untuk mengelola struktur, mengukur kinerja, dan menyusun evaluasi bersama.</p></div>'+
     '<div class="hero-foot">PERGERAKAN MAHASISWA ISLAM INDONESIA · PMII FEBI</div></section>'+
     '<section class="auth-panel"><form class="auth-card" id="auth-form"><div class="eyebrow">Ruang internal organisasi</div><h2>'+(signup?"Buat akun pengurus":"Selamat datang kembali")+'</h2><p>'+(signup?"Daftarkan akun. Ketua Rayon, Sekretaris Umum, Bendahara Umum, atau Kepala Bidang akan memeriksa pendaftaran Anda.":"Masuk untuk melanjutkan proses dan amanah kepengurusan.")+'</p>'+
@@ -156,12 +157,11 @@ function renderAuth() {
     '<div class="field"><label>Password</label><input name="password" type="password" required minlength="8" autocomplete="'+(signup?"new-password":"current-password")+'" placeholder="Minimal 8 karakter"></div>'+
     '<button class="btn btn-block" type="submit">'+(signup?"Daftar akun":"Masuk ke SIGAP")+'</button>'+
     '<div class="auth-switch">'+(signup?'Sudah memiliki akun? <button type="button" class="link-btn" data-auth-mode="login">Masuk</button>':'Belum memiliki akun? <button type="button" class="link-btn" data-auth-mode="signup">Daftar sekarang</button>')+'</div>'+
-    '<div class="auth-switch"><button type="button" class="link-btn" id="public-structure">Lihat struktur organisasi publik</button></div>'+
-     '<p class="tiny muted" style="margin-top:24px;line-height:1.6">Email tidak perlu diverifikasi. Akun baru menunggu persetujuan Ketua Rayon, Sekretaris Umum, Bendahara Umum, atau Kepala Bidang. Penetapan jabatan tetap dilakukan oleh pengurus berwenang.</p></form></section></div>';
+     '<div class="auth-credit">Dibuat oleh <strong>Dzaky Luqman Abdullah</strong><span>Kepala Bidang Eksternal</span></div></form></section></div>';
 }
 function renderPending() {
   const status=state.profile?.account_status || "pending";
-  const message=status==="rejected"?"Pendaftaran akun ditolak. Silakan hubungi Ketua Rayon atau pengurus yang memeriksa pendaftaran.":status==="suspended"?"Akses akun sedang dinonaktifkan. Silakan hubungi Admin Sistem.":"Akun Anda sudah terdaftar. Tunggu persetujuan Ketua Rayon, Sekretaris Umum, Bendahara Umum, atau Kepala Bidang. Anda tidak perlu memverifikasi email.";
+  const message=status==="rejected"?"Pendaftaran akun ditolak. Silakan hubungi Ketua Rayon atau pengurus yang memeriksa pendaftaran.":status==="suspended"?"Akses akun sedang dinonaktifkan. Silakan hubungi Admin Sistem.":"Akun Anda sudah terdaftar. Tunggu persetujuan Ketua Rayon, Sekretaris Umum, Bendahara Umum, atau Kepala Bidang";
   root.innerHTML='<div class="pending-wrap"><section class="pending-card"><div class="brand-logo pending-logo"><img src="https://1.bp.blogspot.com/-_LPIjxug5bs/W1YpWUAw0FI/AAAAAAAAAac/26D9u4GoFe0qM9sdOUpfSyV0MH4RO1y0QCLcBGAs/s1600/logo_pmii_hd.png" alt="Logo PMII Rayon Ekonomi Bisnis Islam"></div><div class="pending-icon">⌛</div><div class="eyebrow">SIGAP PMII FEBI</div><h2 style="margin:10px 0">Akun dalam proses</h2><p class="muted" style="line-height:1.7">'+esc(message)+'</p><div style="margin-top:24px"><button class="btn btn-ghost" id="refresh-status">Periksa status lagi</button> <button class="btn" id="logout">Keluar</button></div></section></div>';
 }
 function navItem(view,icon,label) {
@@ -724,7 +724,7 @@ async function handleAuth(form) {
       result=await authRequest("/token?grant_type=password",{method:"POST",body:JSON.stringify({email:values.email,password:values.password})});
     } catch(loginError) {
       state.authMode="login"; renderAuth();
-      toast("Pendaftaran tersimpan. Coba masuk dengan email dan password yang sama; tidak perlu klik tautan verifikasi. "+loginError.message,true);
+      toast("Pendaftaran tersimpan. Coba masuk dengan email dan password yang sama. "+loginError.message,true);
       return;
     }
   }
