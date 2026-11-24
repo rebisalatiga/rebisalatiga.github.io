@@ -15,7 +15,9 @@ SIGAP membantu pengurus mengelola struktur rayon, bidang, biro, keanggotaan, per
 
 - Registrasi tanpa verifikasi email; akun baru menunggu persetujuan.
 - Persetujuan pendaftaran oleh Ketua Rayon, Sekretaris Umum, Bendahara Umum, atau Kepala Bidang; koordinator biro dan anggota tidak dapat menyetujui.
-- Pengelolaan role dan unit organisasi sesuai struktur PMII FEBI.
+- Pengelolaan role dan unit organisasi sesuai struktur PMII FEBI, termasuk Sekretaris Bidang sejajar dengan Kepala Bidang.
+- Data anggota nominal dapat dicatat oleh pimpinan unit tanpa anggota harus mendaftar atau memiliki akun SIGAP.
+- Penilaian dan evaluasi dapat ditulis untuk anggota nominal, lengkap dengan cetak rapor per orang.
 - Periode kepengurusan.
 - Penilaian dengan enam indikator berbobot dan skala 1–5.
 - Evaluasi tertulis, rekomendasi perbaikan, dan tinjau admin.
@@ -24,7 +26,7 @@ SIGAP membantu pengurus mengelola struktur rayon, bidang, biro, keanggotaan, per
 
 ## Struktur organisasi awal
 
-Ketua Rayon → Sekretaris Umum dan Bendahara Umum → Kepala Bidang I (Internal), II (Eksternal), III (Kajian) → biro.
+Ketua Rayon → Sekretaris Umum dan Bendahara Umum → Kepala Bidang serta Sekretaris Bidang pada Bidang I (Internal), II (Eksternal), III (Kajian) → koordinator biro → anggota.
 
 - Internal: Kaderisasi, PAPO.
 - Eksternal: Entrepreneur, HKOG, Soshum, Medinfo.
