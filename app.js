@@ -77,6 +77,9 @@ async function restoreSession() {
 }
 function periodActive() { return state.periods.find(p=>p.id===state.periodId) || state.periods.find(p=>p.status==="active") || null; }
 function isAdmin() { return state.memberships.some(m=>m.role==="admin" && m.status==="active"); }
+function canApproveAccounts() {
+  return isAdmin() || ownMemberships().some(m=>["ketua_rayon","sekretaris_umum","bendahara_umum","kepala_bidang"].includes(m.role));
+}
 function ownMemberships() { return state.memberships.filter(m=>m.user_id===state.user?.id && m.status==="active"); }
 function activeMemberships() {
   const p=periodActive();
@@ -116,17 +119,17 @@ function renderAuth() {
     '<section class="auth-hero"><div class="brand-lockup"><div class="brand-mark">P</div><div><strong>SIGAP PMII FEBI</strong><small>Sistem Informasi Evaluasi Kepengurusan</small></div></div>'+
     '<div class="hero-copy"><div class="eyebrow">Bergerak · Berproses · Bertumbuh</div><h1>Merawat amanah.<br>Menumbuhkan gerakan.</h1><p>Ruang digital pengurus PMII Fakultas Ekonomi dan Bisnis Islam untuk mengelola struktur, mengukur kinerja, dan menyusun evaluasi bersama.</p></div>'+
     '<div class="hero-foot">PERGERAKAN MAHASISWA ISLAM INDONESIA · PMII FEBI</div></section>'+
-    '<section class="auth-panel"><form class="auth-card" id="auth-form"><div class="eyebrow">Ruang internal organisasi</div><h2>'+(signup?"Buat akun pengurus":"Selamat datang kembali")+'</h2><p>'+(signup?"Daftarkan akun. Admin rayon akan memeriksa dan menetapkan jabatan Anda.":"Masuk untuk melanjutkan proses dan amanah kepengurusan.")+'</p>'+
+    '<section class="auth-panel"><form class="auth-card" id="auth-form"><div class="eyebrow">Ruang internal organisasi</div><h2>'+(signup?"Buat akun pengurus":"Selamat datang kembali")+'</h2><p>'+(signup?"Daftarkan akun. Ketua Rayon, Sekretaris Umum, Bendahara Umum, atau Kepala Bidang akan memeriksa pendaftaran Anda.":"Masuk untuk melanjutkan proses dan amanah kepengurusan.")+'</p>'+
     (signup?'<div class="field"><label>Nama lengkap</label><input name="full_name" required maxlength="100" placeholder="Nama sesuai identitas"></div><div class="field"><label>NIM (opsional)</label><input name="nim" maxlength="40" placeholder="Nomor Induk Mahasiswa"></div><div class="field"><label>Angkatan (opsional)</label><input name="cohort" maxlength="20" placeholder="Contoh: 2024"></div>':'')+
     '<div class="field"><label>Email</label><input name="email" type="email" required autocomplete="email" placeholder="nama@email.com"></div>'+
     '<div class="field"><label>Password</label><input name="password" type="password" required minlength="8" autocomplete="'+(signup?"new-password":"current-password")+'" placeholder="Minimal 8 karakter"></div>'+
     '<button class="btn btn-block" type="submit">'+(signup?"Daftar akun":"Masuk ke SIGAP")+'</button>'+
     '<div class="auth-switch">'+(signup?'Sudah memiliki akun? <button type="button" class="link-btn" data-auth-mode="login">Masuk</button>':'Belum memiliki akun? <button type="button" class="link-btn" data-auth-mode="signup">Daftar sekarang</button>')+'</div>'+
-    '<p class="tiny muted" style="margin-top:24px;line-height:1.6">Akun baru berstatus menunggu persetujuan admin. Penetapan jabatan dilakukan oleh admin, bukan oleh pendaftar.</p></form></section></div>';
+    '<p class="tiny muted" style="margin-top:24px;line-height:1.6">Email tidak perlu diverifikasi. Akun baru menunggu persetujuan Ketua Rayon, Sekretaris Umum, Bendahara Umum, atau Kepala Bidang. Penetapan jabatan tetap dilakukan oleh pengurus berwenang.</p></form></section></div>';
 }
 function renderPending() {
   const status=state.profile?.account_status || "pending";
-  const message=status==="rejected"?"Pendaftaran akun belum dapat disetujui. Silakan hubungi admin rayon.":status==="suspended"?"Akses akun sedang dinonaktifkan. Silakan hubungi admin rayon.":"Akun Anda sudah terdaftar dan sedang menunggu persetujuan serta penetapan jabatan oleh admin PMII FEBI.";
+  const message=status==="rejected"?"Pendaftaran akun ditolak. Silakan hubungi Ketua Rayon atau pengurus yang memeriksa pendaftaran.":status==="suspended"?"Akses akun sedang dinonaktifkan. Silakan hubungi Admin Sistem.":"Akun Anda sudah terdaftar. Tunggu persetujuan Ketua Rayon, Sekretaris Umum, Bendahara Umum, atau Kepala Bidang. Anda tidak perlu memverifikasi email.";
   root.innerHTML='<div class="pending-wrap"><section class="pending-card"><div class="brand-mark" style="margin:0 auto 22px">P</div><div class="pending-icon">⌛</div><div class="eyebrow">SIGAP PMII FEBI</div><h2 style="margin:10px 0">Akun dalam proses</h2><p class="muted" style="line-height:1.7">'+esc(message)+'</p><div style="margin-top:24px"><button class="btn btn-ghost" id="refresh-status">Periksa status lagi</button> <button class="btn" id="logout">Keluar</button></div></section></div>';
 }
 function navItem(view,icon,label) {
@@ -139,7 +142,7 @@ function renderShell() {
   root.innerHTML='<div class="app-shell"><aside class="sidebar" id="sidebar"><div class="side-brand"><div class="brand-mark">P</div><div><strong>SIGAP PMII FEBI</strong><small>Ruang kerja kepengurusan</small></div></div>'+
     '<div class="nav-label">Menu utama</div><nav class="nav-list">'+
       navItem("overview","⌂","Dashboard")+navItem("structure","⌘","Struktur organisasi")+navItem("evaluations","✓","Penilaian & evaluasi")+navItem("reports","▤","Laporan kegiatan")+
-    '</nav>'+(isAdmin()?'<div class="nav-label">Administrasi</div><nav class="nav-list">'+navItem("admin","⚙","Panel admin")+'</nav>':'')+
+    '</nav>'+(canApproveAccounts()?'<div class="nav-label">Persetujuan</div><nav class="nav-list">'+navItem("approvals","✓","Persetujuan akun")+'</nav>':'')+(isAdmin()?'<div class="nav-label">Administrasi sistem</div><nav class="nav-list">'+navItem("admin","⚙","Panel admin")+'</nav>':'')+
     '<div class="side-bottom"><div class="user-mini"><div class="avatar">'+esc((profile.full_name||"P").slice(0,1).toUpperCase())+'</div><div><strong>'+esc(profile.full_name||"Pengurus")+'</strong><small>'+esc(roleLabels[firstRole]||"Pengurus")+'</small></div></div><button class="nav-item" id="logout" style="width:100%">⇥ Keluar dari akun</button></div></aside>'+
     '<main class="main-area"><header class="topbar"><div style="display:flex;align-items:center;gap:12px"><button class="mobile-menu" id="mobile-menu" aria-label="Buka menu">☰</button><div><div class="top-title">PMII Fakultas Ekonomi dan Bisnis Islam</div><div class="top-sub">Sistem evaluasi dan pengembangan kepengurusan</div></div></div>'+
     '<div class="top-actions">'+(state.periods.length?'<select class="period-select" id="period-select" aria-label="Periode kepengurusan">'+state.periods.map(x=>'<option value="'+esc(x.id)+'" '+(x.id===state.periodId?"selected":"")+'>'+esc(x.name)+(x.status==="active"?" · Aktif":"")+'</option>').join("")+'</select>':'')+'<button class="btn btn-ghost" id="refresh-data">↻</button></div></header><section class="page" id="page-content">'+renderView()+'</section></main></div>';
@@ -296,7 +299,16 @@ function renderAdmin() {
     (active?'<form id="assign-form"><div class="field"><label>Pengurus</label><select name="user_id" required><option value="">Pilih pengurus aktif</option>'+approved.map(p=>'<option value="'+p.id+'">'+esc(p.full_name)+' · '+esc(p.nim||"tanpa NIM")+'</option>').join("")+'</select></div><div class="field"><label>Periode</label><select name="period_id" required><option value="'+active.id+'">'+esc(active.name)+' · Aktif</option>'+periods.filter(p=>p.status!=="active").map(p=>'<option value="'+p.id+'">'+esc(p.name)+' · '+esc(p.status)+'</option>').join("")+'</select></div><div class="field"><label>Jabatan / role</label><select name="role" required><option value="">Pilih role</option>'+Object.entries(roleLabels).map(([key,label])=>'<option value="'+key+'">'+esc(label)+'</option>').join("")+'</select></div><div class="field"><label>Unit organisasi</label><select name="unit_id" required><option value="">Pilih bidang / biro / rayon</option>'+state.units.map(u=>'<option value="'+u.id+'">'+esc(u.name)+'</option>').join("")+'</select></div><div class="field"><label>Nama posisi (opsional)</label><input name="position_title" placeholder="Contoh: Koordinator Kaderisasi"></div><div class="form-actions"><button class="btn" type="submit">Simpan penempatan</button></div></form>':'<div class="empty"><strong>Aktifkan periode terlebih dahulu</strong>Penempatan jabatan membutuhkan periode kepengurusan.</div>')+
     '</section></div><section class="panel"><div class="panel-head"><div><h3>Ringkasan akun disetujui</h3><p>'+approved.length+' akun aktif pada sistem.</p></div></div><div class="table-wrap"><table><thead><tr><th>Nama</th><th>NIM</th><th>Status</th></tr></thead><tbody>'+(approved.length?approved.map(p=>'<tr><td>'+esc(p.full_name)+'</td><td>'+esc(p.nim||"—")+'</td><td><span class="badge">Aktif</span></td></tr>').join(""):'<tr><td colspan="3" class="muted">Belum ada akun aktif.</td></tr>')+'</tbody></table></div></section></div>';
 }
+function renderApprovals() {
+  const pending=state.profiles.filter(p=>p.account_status==="pending");
+  return pageHeading("Persetujuan akun","Tinjau pendaftaran anggota sebelum mereka dapat masuk dan menggunakan SIGAP.")+
+    '<div class="notice">Persetujuan dapat dilakukan oleh Ketua Rayon, Sekretaris Umum, Bendahara Umum, dan Kepala Bidang. Koordinator Biro serta Anggota tidak memiliki hak persetujuan akun.</div>'+
+    '<section class="panel"><div class="panel-head"><div><h3>Pendaftar menunggu persetujuan</h3><p>'+pending.length+' akun menunggu keputusan.</p></div><span class="badge gold">'+pending.length+' menunggu</span></div>'+
+    (pending.length?'<div class="table-wrap"><table><thead><tr><th>Nama</th><th>Email</th><th>NIM</th><th>Tanggal daftar</th><th>Keputusan</th></tr></thead><tbody>'+pending.map(p=>'<tr><td><strong>'+esc(p.full_name||"Belum mengisi nama")+'</strong></td><td>'+esc(p.email||"—")+'</td><td>'+esc(p.nim||"—")+'</td><td>'+dateText(p.created_at)+'</td><td><div class="table-action"><button class="btn btn-ghost" data-approve="'+p.id+'">Setujui</button><button class="btn btn-ghost" data-reject="'+p.id+'">Tolak</button></div></td></tr>').join("")+'</tbody></table></div>':'<div class="empty"><strong>Tidak ada pendaftar tertunda</strong>Pendaftaran baru akan muncul di sini.</div>')+
+    '</section>';
+}
 function renderView() {
+  if(state.view==="approvals" && canApproveAccounts()) return renderApprovals();
   if(state.view==="structure") return renderStructure();
   if(state.view==="evaluations") return renderEvaluations();
   if(state.view==="reports") return renderReports();
@@ -322,11 +334,17 @@ async function handleAuth(form) {
   const signup=state.authMode==="signup";
   const path=signup?"/signup":"/token?grant_type=password";
   const body=signup?{email:values.email,password:values.password,data:{full_name:values.full_name,nim:values.nim||null,cohort:values.cohort||null}}:{email:values.email,password:values.password};
-  const result=await authRequest(path,{method:"POST",body:JSON.stringify(body)});
+  let result=await authRequest(path,{method:"POST",body:JSON.stringify(body)});
   if(signup && !result.access_token) {
-    state.authMode="login"; renderAuth();
-    toast("Pendaftaran diterima. Periksa email untuk verifikasi, lalu masuk kembali.");
-    return;
+    // Some hosted Auth settings still return no session from signup. Auto-confirm is
+    // performed by the database trigger, so try the normal password login immediately.
+    try {
+      result=await authRequest("/token?grant_type=password",{method:"POST",body:JSON.stringify({email:values.email,password:values.password})});
+    } catch(loginError) {
+      state.authMode="login"; renderAuth();
+      toast("Pendaftaran tersimpan. Coba masuk dengan email dan password yang sama; tidak perlu klik tautan verifikasi. "+loginError.message,true);
+      return;
+    }
   }
   if(result.access_token) {
     saveSession({...result,expires_at:Math.floor(Date.now()/1000)+(result.expires_in||3600)});
@@ -409,7 +427,20 @@ document.addEventListener("click",async event=>{
   if(event.target.closest("#refresh-data")){try{await loadData();renderShell();toast("Data berhasil diperbarui.");}catch(e){toast(e.message,true);}return;}
   if(event.target.closest("#mobile-menu")){$("#sidebar")?.classList.toggle("open");return;}
   const approve=event.target.closest("[data-approve]");
-  if(approve){approve.disabled=true;try{await api("profiles?id=eq."+approve.dataset.approve,{method:"PATCH",body:JSON.stringify({account_status:"active"})});toast("Akun disetujui. Tetapkan jabatan pada formulir penempatan.");await loadData();renderShell();}catch(e){toast(e.message,true);approve.disabled=false;}return;}
+  const reject=event.target.closest("[data-reject]");
+  if(approve || reject){
+    const control=approve||reject;
+    const targetId=control.dataset.approve||control.dataset.reject;
+    const accept=!!approve;
+    if(!accept && !window.confirm("Tolak pendaftaran akun ini?")) return;
+    control.disabled=true;
+    try {
+      await api("rpc/approve_pending_account",{method:"POST",body:JSON.stringify({p_target_user_id:targetId,p_approve:accept})});
+      toast(accept?"Akun disetujui. Pengurus berwenang dapat menetapkan jabatan berikutnya.":"Pendaftaran akun ditolak.");
+      await loadData();state.view=canApproveAccounts()?"approvals":"admin";renderShell();
+    } catch(e){toast(e.message,true);control.disabled=false;}
+    return;
+  }
   const review=event.target.closest("[data-review-evaluation]");
   if(review){review.disabled=true;try{await api("evaluations?id=eq."+review.dataset.reviewEvaluation,{method:"PATCH",body:JSON.stringify({status:"reviewed",reviewed_at:new Date().toISOString()})});toast("Penilaian telah ditandai ditinjau.");await loadData();renderShell();}catch(e){toast(e.message,true);review.disabled=false;}return;}
   const editReport=event.target.closest("[data-edit-report]");
