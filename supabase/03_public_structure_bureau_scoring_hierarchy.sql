@@ -322,6 +322,13 @@ grant select (id, full_name, account_status)
   on public.profiles to anon;
 grant select (user_id, unit_id, period_id, status, role, position_title)
   on public.memberships to anon;
+-- Remove any old broad anonymous grants on the nominal roster (including NIM/cohort and writes).
+revoke all privileges on table public.member_roster from anon;
+revoke all privileges (
+  id, period_id, unit_id, full_name, nim, cohort, position_title,
+  linked_user_id, created_by_membership_id, is_active, created_at, updated_at
+) on table public.member_roster from anon;
+
 grant select (unit_id, period_id, full_name, position_title, is_active)
   on public.member_roster to anon;
 
