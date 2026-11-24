@@ -1,8 +1,8 @@
 -- SIGAP PMII FEBI: bootstrap admin pertama
--- Jalankan sekali di Supabase Dashboard > SQL Editor SETELAH admin pertama mendaftar
--- dan memverifikasi emailnya di website.
+-- Jalankan sekali di Supabase Dashboard > SQL Editor SETELAH admin pertama mendaftar.
+-- Verifikasi email tidak diperlukan; trigger database mengonfirmasi email baru otomatis.
 --
--- WAJIB: ganti alamat email di bawah dengan email akun Anda yang sudah terdaftar.
+-- WAJIB: ganti alamat email di bawah dengan email akun yang sudah terdaftar.
 -- Jangan membagikan akses SQL Editor kepada pengguna biasa.
 
 do $$
@@ -19,7 +19,7 @@ begin
   limit 1;
 
   if v_admin_id is null then
-    raise exception 'Akun dengan email tersebut belum ditemukan atau email belum diverifikasi. Daftar dan verifikasi email terlebih dahulu.';
+    raise exception 'Akun dengan email tersebut belum ditemukan atau proses konfirmasi otomatis belum berjalan. Daftarkan akun terlebih dahulu.';
   end if;
 
   select id into v_rayon_id
