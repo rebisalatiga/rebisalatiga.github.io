@@ -18,7 +18,7 @@ SIGAP membantu pengurus mengelola struktur rayon, bidang, biro, keanggotaan, per
 - Periode kepengurusan.
 - Penilaian dengan enam indikator berbobot dan skala 1–5.
 - Evaluasi tertulis, rekomendasi perbaikan, dan tinjau admin.
-- Laporan kegiatan dengan fitur edit draft.
+- Laporan kegiatan dengan edit draft, pengiriman untuk ditinjau, persetujuan penanggung jawab, dan permintaan revisi.
 - Jejak audit perubahan penting.
 
 ## Struktur organisasi awal
