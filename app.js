@@ -220,12 +220,26 @@ function renderEvaluations() {
   return pageHeading("Penilaian & evaluasi","Nilai kinerja berdasarkan indikator, bukti, dan catatan pembinaan.")+
     '<div class="split"><div class="stack">'+form+'</div><section class="panel"><div class="panel-head"><div><h3>Riwayat penilaian</h3><p>Penilaian yang dapat Anda akses</p></div><span class="badge">'+list.length+' catatan</span></div><div class="eval-grid">'+(list.length?list.map(renderEvaluationCard).join(""):'<div class="empty"><strong>Belum ada penilaian</strong>Penilaian akan muncul di sini setelah dikirim.</div>')+'</div></section></div>';
 }
+function canManageUnit(unitId) {
+  if(isAdmin()) return true;
+  return ownMemberships().some(m=>
+    m.role==="ketua_rayon" ||
+    (m.role==="kepala_bidang" && descendantsOf(m.unit_id).has(unitId)) ||
+    (m.role==="koordinator_biro" && m.unit_id===unitId)
+  );
+}
 function renderReportCard(r) {
   const unit=unitFor(r.unit_id);
   const owner=state.memberships.find(m=>m.id===r.created_by_membership_id);
-  const canEdit=r.status==="draft" && owner?.user_id===state.user?.id;
+  const ownerCanEdit=owner?.user_id===state.user?.id && ["draft","revision_requested"].includes(r.status);
+  const managerCanEdit=canManageUnit(r.unit_id) && ["draft","revision_requested"].includes(r.status);
+  const canSubmit=owner?.user_id===state.user?.id && ["draft","revision_requested"].includes(r.status);
+  const canReview=canManageUnit(r.unit_id) && r.status==="submitted";
   const evidence=r.evidence_url?'<a class="tiny" href="'+esc(r.evidence_url)+'" target="_blank" rel="noopener">Buka bukti kegiatan ↗</a>':"";
-  return '<article class="report-card"><div class="eval-meta"><div><h4>'+esc(r.title)+'</h4><div class="tiny muted">'+esc(unit?.name||"Unit")+' · '+dateText(r.activity_date||r.created_at)+'</div></div><span class="badge '+(r.status==="approved"?"":"gold")+'">'+esc(({draft:"Draft",submitted:"Terkirim",approved:"Disetujui",revision_requested:"Perlu revisi"})[r.status]||r.status)+'</span></div><p>'+esc(r.description||"Tidak ada deskripsi.")+'</p><div class="tiny muted">Target: '+esc(r.target||"—")+' · Realisasi: '+esc(r.realization||"—")+'</div><div class="row between" style="margin-top:10px">'+evidence+(canEdit?'<button class="btn btn-ghost" data-edit-report="'+r.id+'">Edit draft</button>':'')+'</div></article>';
+  const actions=(ownerCanEdit||managerCanEdit?'<button class="btn btn-ghost" data-edit-report="'+r.id+'">Edit laporan</button>':"")+
+    (canSubmit?'<button class="btn" data-submit-report="'+r.id+'">Kirim laporan</button>':"")+
+    (canReview?'<button class="btn" data-review-report="'+r.id+'" data-status="approved">Setujui</button><button class="btn btn-danger" data-review-report="'+r.id+'" data-status="revision_requested">Minta revisi</button>':"");
+  return '<article class="report-card"><div class="eval-meta"><div><h4>'+esc(r.title)+'</h4><div class="tiny muted">'+esc(unit?.name||"Unit")+' · '+dateText(r.activity_date||r.created_at)+'</div></div><span class="badge '+(r.status==="approved"?"":r.status==="revision_requested"?"red":"gold")+'">'+esc(({draft:"Draft",submitted:"Terkirim",approved:"Disetujui",revision_requested:"Perlu revisi"})[r.status]||r.status)+'</span></div><p>'+esc(r.description||"Tidak ada deskripsi.")+'</p><div class="tiny muted">Target: '+esc(r.target||"—")+' · Realisasi: '+esc(r.realization||"—")+'</div><div class="row between wrap" style="margin-top:10px">'+evidence+'<div class="row wrap">'+actions+'</div></div>'+(r.reviewer_notes?'<div class="notice warn" style="margin-top:10px">Catatan peninjau: '+esc(r.reviewer_notes)+'</div>':"")+'</article>';
 }
 function renderReports() {
   const p=periodActive();
@@ -240,9 +254,11 @@ function renderReports() {
 }
 function openReportEditor(id) {
   const report=state.reports.find(r=>r.id===id);
-  if(!report || report.status!=="draft") return;
+  if(!report || !["draft","revision_requested"].includes(report.status)) return;
   const owner=state.memberships.find(m=>m.id===report.created_by_membership_id);
-  if(owner?.user_id!==state.user?.id) return;
+  const authorizedOwner=owner?.user_id===state.user?.id;
+  const authorizedManager=canManageUnit(report.unit_id);
+  if(!authorizedOwner && !authorizedManager) return;
   const field=(label,name,value,type="text")=>'<div class="field"><label>'+label+'</label><input name="'+name+'" type="'+type+'" value="'+esc(value||"")+'"></div>';
   const overlay=document.createElement("div");
   overlay.className="modal-backdrop";
@@ -398,6 +414,31 @@ document.addEventListener("click",async event=>{
   if(review){review.disabled=true;try{await api("evaluations?id=eq."+review.dataset.reviewEvaluation,{method:"PATCH",body:JSON.stringify({status:"reviewed",reviewed_at:new Date().toISOString()})});toast("Penilaian telah ditandai ditinjau.");await loadData();renderShell();}catch(e){toast(e.message,true);review.disabled=false;}return;}
   const editReport=event.target.closest("[data-edit-report]");
   if(editReport){openReportEditor(editReport.dataset.editReport);return;}
+  const submitReportButton=event.target.closest("[data-submit-report]");
+  if(submitReportButton){
+    submitReportButton.disabled=true;
+    try {
+      const record=state.reports.find(r=>r.id===submitReportButton.dataset.submitReport);
+      if(!record || !["draft","revision_requested"].includes(record.status)) throw new Error("Laporan tidak lagi dapat dikirim.");
+      await api("activity_reports?id=eq."+encodeURIComponent(record.id),{method:"PATCH",body:JSON.stringify({status:"submitted",reviewer_notes:null})});
+      toast("Laporan berhasil dikirim untuk ditinjau.");await loadData();renderShell();
+    } catch(e){toast(e.message,true);submitReportButton.disabled=false;}
+    return;
+  }
+  const reviewReportButton=event.target.closest("[data-review-report]");
+  if(reviewReportButton){
+    const status=reviewReportButton.dataset.status;
+    const note=status==="revision_requested"?window.prompt("Tuliskan catatan revisi untuk unit ini:"):null;
+    if(status==="revision_requested" && note===null) return;
+    reviewReportButton.disabled=true;
+    try {
+      await api("activity_reports?id=eq."+encodeURIComponent(reviewReportButton.dataset.reviewReport),{method:"PATCH",body:JSON.stringify({
+        status,reviewer_notes:note|| (status==="approved"?"Disetujui oleh penanggung jawab.":null)
+      })});
+      toast(status==="approved"?"Laporan disetujui.":"Catatan revisi berhasil dikirim.");await loadData();renderShell();
+    } catch(e){toast(e.message,true);reviewReportButton.disabled=false;}
+    return;
+  }
   const activate=event.target.closest("[data-set-active]");
   if(activate){activate.disabled=true;try{await activatePeriod(activate.dataset.setActive);}catch(e){toast(e.message,true);activate.disabled=false;}return;}
 });
