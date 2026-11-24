@@ -292,21 +292,75 @@ function renderOverview() {
     '<div class="table-wrap"><table class="dashboard-table"><thead><tr><th>Nama anggota</th><th>Unit</th><th>Penilai</th><th>Nilai</th><th>Status</th></tr></thead><tbody>'+table+'</tbody></table></div></section>'+
     '<div class="dashboard-footnote"><span><i></i> Sistem Informasi Evaluasi dan Penilaian Kepengurusan</span><span>PMII Rayon Ekonomi Bisnis Islam</span></div>';
 }
-function personChips(unit) {
-  const people=state.publicStructure.filter(person=>person.unit_id===unit.id && person.person_name);
-  const chips=people.map(person=>{
-    const position=person.person_position || roleLabels[person.person_role] || "Anggota";
-    return '<span class="person-chip">'+esc(person.person_name)+' · '+esc(position)+'</span>';
-  });
-  return '<div class="unit-people">'+(chips.length?chips.join(""):'<span class="person-chip">Belum ada nama tercatat</span>')+'</div>';
+function structurePeople(unitId) {
+  return state.publicStructure
+    .filter(person=>person.unit_id===unitId && person.person_name)
+    .sort((a,b)=>{
+      const ap=String(a.person_position||"").toLowerCase();
+      const bp=String(b.person_position||"").toLowerCase();
+      const rank=x=>x.includes("waka")||x.includes("ketua rayon")?0:x.includes("sekretaris")?1:x.includes("bendahara")?2:x.includes("koordinator")?3:4;
+      return rank(ap)-rank(bp)||String(a.person_name).localeCompare(String(b.person_name),"id");
+    });
+}
+function orgPersonBox(person,emptyPosition) {
+  const position=person?.person_position || emptyPosition || "Anggota";
+  const name=person?.person_name || "Nama belum diisi";
+  return '<div class="org-person-box'+(person?'':' is-empty')+'"><span class="org-person-position">'+esc(position)+'</span><strong>'+esc(name)+'</strong></div>';
+}
+function renderOrgExecutive(unit) {
+  const person=structurePeople(unit.id)[0];
+  const fallback=unit.code==="sekretaris-umum"?"Sekretaris":unit.code==="bendahara-umum"?"Bendahara":unit.name;
+  return '<div class="org-exec-node">'+orgPersonBox(person,fallback)+'</div>';
+}
+function renderOrgBureau(unit) {
+  const people=structurePeople(unit.id);
+  const coordinatorIndex=people.findIndex(person=>String(person.person_position||"").toLowerCase().includes("koordinator"));
+  const coordinator=coordinatorIndex>=0?people[coordinatorIndex]:null;
+  const members=people.filter((person,index)=>index!==coordinatorIndex);
+  return '<section class="org-bureau-card"><header class="org-bureau-heading"><span>BIRO</span><strong>'+esc(unit.name)+'</strong></header>'+
+    '<div class="org-bureau-people">'+
+      '<div class="org-coordinator-label">Koordinator</div>'+orgPersonBox(coordinator,"Koordinator Biro")+
+      '<div class="org-members-label">Anggota ('+members.length+')</div>'+
+      (members.length?members.map(person=>orgPersonBox(person,"Anggota Biro")).join(""):'<div class="org-no-members">Belum ada anggota tercatat</div>')+
+    '</div></section>';
+}
+function renderOrgField(unit) {
+  const leaders=structurePeople(unit.id);
+  const leaderNodes=leaders.map(person=>orgPersonBox(person,person.person_position||"Pengurus Bidang")).join("");
+  const bureaus=state.units.filter(item=>item.parent_id===unit.id && item.unit_type==="bureau")
+    .sort((a,b)=>a.sort_order-b.sort_order);
+  const bureauRows=[];
+  for(let i=0;i<bureaus.length;i+=2) bureauRows.push(bureaus.slice(i,i+2));
+  const renderedRows=bureauRows.map(row=>'<div class="org-bureau-row">'+row.map(renderOrgBureau).join("")+'</div>').join("");
+  return '<section class="org-field-branch"><header class="org-field-heading"><span>'+esc(unit.code==="bidang-1-internal"?"BIDANG I":unit.code==="bidang-2-eksternal"?"BIDANG II":"BIDANG III")+'</span><h3>'+esc(unit.name)+'</h3></header>'+
+    '<div class="org-field-leaders">'+(leaderNodes||'<div class="org-empty">Nama pimpinan bidang belum diisi</div>')+'</div>'+
+    '<div class="org-leader-to-bureau"></div>'+
+    '<div class="org-bureau-stack">'+renderedRows+'</div></section>';
 }
 function renderStructure() {
-  const rootUnit=state.units.find(u=>u.code==="pmii-febi");
+  const rootUnit=state.units.find(unit=>unit.code==="pmii-febi");
   if(!rootUnit) return '<div class="empty">Data struktur belum tersedia.</div>';
-  const children=parent=>state.units.filter(u=>u.parent_id===parent).sort((a,b)=>a.sort_order-b.sort_order);
-  const renderUnit=(unit,level)=>'<article class="unit-card" style="margin-left:'+Math.min(level*17,50)+'px"><div class="unit-row"><div class="unit-title"><div class="unit-symbol">'+(unit.unit_type==="bureau"?"◈":unit.unit_type==="field"?"⌘":unit.unit_type==="executive"?"▤":"✦")+'</div><div><strong>'+esc(unit.name)+'</strong><small>'+({rayon:"Struktur rayon",executive:"Unsur eksekutif",field:"Kepala bidang",bureau:"Biro"}[unit.unit_type]||"Unit")+'</small></div></div><span class="badge '+(unit.unit_type==="field"?"gold":"")+'">'+({rayon:"Rayon",executive:"Eksekutif",field:"Bidang",bureau:"Biro"}[unit.unit_type])+'</span></div>'+personChips(unit)+'</article>'+children(unit.id).map(child=>renderUnit(child,level+1)).join("");
-  return pageHeading("Struktur organisasi","Peta kepengurusan PMII FEBI dari Ketua Rayon hingga koordinator dan anggota.")+
-    '<div class="notice">Direktori ini menampilkan nama pengurus dan anggota pada periode aktif. Kepala Bidang memiliki kewenangan lebih tinggi daripada Sekretaris Bidang. Data penilaian dan evaluasi tetap dibatasi menurut lingkup jabatan masing-masing.</div><div class="unit-list">'+renderUnit(rootUnit,0)+'</div>';
+  const executives=state.units.filter(unit=>unit.parent_id===rootUnit.id && unit.unit_type==="executive")
+    .sort((a,b)=>a.sort_order-b.sort_order);
+  const fields=state.units.filter(unit=>unit.parent_id===rootUnit.id && unit.unit_type==="field")
+    .sort((a,b)=>a.sort_order-b.sort_order);
+  const rootPerson=structurePeople(rootUnit.id)[0];
+  const personCount=state.publicStructure.filter(person=>person.person_name).length;
+  const periodName=state.periods?.find(period=>period.status==="active")?.name || "2026-2027";
+  const executiveNodes=executives.map(renderOrgExecutive).join("");
+  const fieldNodes=fields.map(renderOrgField).join("");
+  return pageHeading("Struktur organisasi","Bagan resmi kepengurusan PMII Rayon Ekonomi dan Bisnis Islam.")+
+    '<section class="org-document"><header class="org-document-heading"><div class="org-document-kicker">SUSUNAN PENGURUS</div><h2>PERGERAKAN MAHASISWA ISLAM INDONESIA</h2><h3>RAYON EKONOMI DAN BISNIS ISLAM</h3><p>MASA KHIDMAT '+esc(periodName==="2026-2027"?"2026/2027":periodName)+'</p><div class="org-document-meta"><span>'+personCount+' nama pengurus</span><span>Direktori terbuka untuk umum</span></div></header>'+
+    '<div class="org-directory-actions"><a class="btn btn-ghost" href="./?struktur">Buka tautan publik ↗</a><button class="btn btn-ghost" type="button" data-print-organization>Cetak bagan</button></div>'+
+    '<div class="notice">Bagan ini dapat dilihat oleh semua orang, termasuk pengunjung tanpa akun dan pengguna yang sudah login. Nama dan jabatan bersifat publik; menu penilaian, skor, dan evaluasi tetap dilindungi sesuai kewenangan struktural.</div>'+
+    '<div class="org-chart-scroll"><div class="org-chart">'+
+      '<div class="org-root-node">'+orgPersonBox(rootPerson,"Ketua Rayon")+'</div>'+
+      '<div class="org-root-stem"></div>'+
+      '<div class="org-major-branches">'+
+        '<section class="org-executive-branch"><header class="org-branch-title"><span>UNSUR EKSEKUTIF</span><strong>Sekretariat & Keuangan</strong></header><div class="org-executive-grid">'+executiveNodes+'</div></section>'+
+        fieldNodes+
+      '</div></div></div>'+
+    '<footer class="org-document-footer">SIGAP PMII FEBI · Sistem Informasi Evaluasi dan Penilaian Kepengurusan</footer></section>';
 }
 function descendantsOf(unitId) {
   const found=new Set([unitId]); let changed=true;
@@ -691,6 +745,7 @@ async function assignRole(form) {
   await loadData(); state.view="admin"; render();
 }
 document.addEventListener("click",async event=>{
+  if(event.target.closest("[data-print-organization]")){window.print();return;}
   if(event.target.closest("#public-structure")){
     const trigger=event.target.closest("#public-structure");trigger.disabled=true;
     try{await loadPublicStructure();}catch(e){toast(e.message,true);trigger.disabled=false;}
