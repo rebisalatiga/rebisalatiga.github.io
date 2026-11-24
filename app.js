@@ -309,6 +309,84 @@ function openReportEditor(id) {
     } catch(error) {toast(error.message,true);submit.disabled=false;}
   });
 }
+function renderRoster() {
+  const p=periodActive();
+  if(!p) return pageHeading("Data anggota & rapor","Catat nama pengurus/anggota dan susun rapor penilaian.")+
+    '<div class="empty"><strong>Belum ada periode aktif</strong>Admin Sistem perlu mengaktifkan periode sebelum data anggota dibuat.</div>';
+  const units=manageableUnits();
+  const allowed=new Set(units.map(u=>u.id));
+  const people=state.roster.filter(m=>m.period_id===p.id && allowed.has(m.unit_id))
+    .sort((a,b)=>a.full_name.localeCompare(b.full_name,"id"));
+  const unitOptions=units.map(u=>'<option value="'+u.id+'">'+esc(u.name)+'</option>').join("");
+  return pageHeading("Data anggota & rapor","Masukkan nama orang yang berada di bawah unit Anda. Mereka tidak perlu membuat akun SIGAP untuk dicatat dan dinilai.")+
+    '<div class="notice">Daftar ini adalah data keanggotaan/rapor organisasi, bukan akun login. Ketua Rayon dapat mengelola seluruh unit; Kepala Bidang dan Sekretaris Bidang mengelola bidang beserta biro di bawahnya; Koordinator Biro mengelola unit bironya.</div>'+
+    '<div class="split"><section class="panel"><div class="panel-head"><div><h3>Tambah anggota</h3><p>Data akan masuk ke struktur dan dapat dipilih pada formulir penilaian.</p></div></div>'+
+    '<form id="roster-form"><div class="field"><label>Nama lengkap</label><input name="full_name" required maxlength="120" placeholder="Nama anggota"></div><div class="field"><label>Unit / biro</label><select name="unit_id" required><option value="">Pilih unit</option>'+unitOptions+'</select></div><div class="field"><label>Jabatan dalam unit</label><input name="position_title" maxlength="100" placeholder="Contoh: Anggota / Staf Kaderisasi" value="Anggota"></div><div class="form-grid"><div class="field"><label>NIM (opsional)</label><input name="nim" maxlength="40" placeholder="Nomor induk mahasiswa"></div><div class="field"><label>Angkatan (opsional)</label><input name="cohort" maxlength="20" placeholder="Contoh: 2024"></div></div><div class="form-actions"><button class="btn" type="submit">Simpan nama anggota</button></div></form></section>'+
+    '<section class="panel"><div class="panel-head"><div><h3>Daftar anggota nominal</h3><p>'+people.filter(x=>x.is_active).length+' aktif · '+people.filter(x=>!x.is_active).length+' diarsipkan · '+esc(p.name)+'</p></div></div>'+
+    (people.length?'<div class="table-wrap"><table><thead><tr><th>Nama</th><th>Unit</th><th>NIM</th><th>Status</th><th>Aksi</th></tr></thead><tbody>'+people.map(m=>'<tr><td><strong>'+esc(m.full_name)+'</strong><div class="tiny muted">'+esc(m.position_title||"Anggota")+(m.cohort?" · Angkatan "+esc(m.cohort):"")+'</div></td><td>'+esc(unitFor(m.unit_id)?.name||"")+'</td><td>'+esc(m.nim||"—")+'</td><td><span class="badge '+(m.is_active?"":"grey")+'">'+(m.is_active?"Aktif":"Diarsipkan")+'</span></td><td><div class="table-action"><button class="btn btn-ghost" data-edit-roster="'+m.id+'">Edit</button><button class="btn btn-ghost" data-print-roster="'+m.id+'">Cetak rapor</button><button class="btn btn-ghost" data-toggle-roster="'+m.id+'" data-active="'+(!m.is_active)+'">'+(m.is_active?"Arsipkan":"Aktifkan")+'</button></div></td></tr>').join("")+'</tbody></table></div>':'<div class="empty"><strong>Belum ada nama anggota</strong>Tambahkan nama pada formulir di sebelah kiri. Mereka tidak perlu memiliki akun login.</div>')+
+    '</section></div>';
+}
+async function saveRoster(form) {
+  const v=Object.fromEntries(new FormData(form).entries());
+  const p=periodActive();
+  if(!p) throw new Error("Belum ada periode kepengurusan yang aktif.");
+  if(!canManageUnit(v.unit_id)) throw new Error("Anda tidak memiliki kewenangan mengelola unit tersebut.");
+  const creator=managerMembershipForUnit(v.unit_id);
+  if(!creator) throw new Error("Penugasan struktural Anda belum aktif pada periode ini.");
+  await api("member_roster",{method:"POST",body:JSON.stringify({
+    period_id:p.id,unit_id:v.unit_id,full_name:v.full_name.trim(),
+    nim:v.nim||null,cohort:v.cohort||null,position_title:v.position_title||"Anggota",
+    created_by_membership_id:creator.id,is_active:true
+  })});
+  toast("Nama anggota berhasil disimpan. Sekarang dapat dipilih untuk penilaian dan rapor.");
+  await loadData();state.view="roster";renderShell();
+}
+function openRosterEditor(id) {
+  const person=state.roster.find(m=>m.id===id);
+  if(!person || !canManageUnit(person.unit_id)) return;
+  const overlay=document.createElement("div");
+  overlay.className="modal-backdrop";
+  overlay.innerHTML='<form class="modal" id="edit-roster-form"><div class="row between"><h3>Edit data anggota</h3><button type="button" class="btn btn-ghost" id="close-edit-roster">Tutup</button></div><input type="hidden" name="id" value="'+person.id+'"><div class="field"><label>Nama lengkap</label><input name="full_name" required maxlength="120" value="'+esc(person.full_name)+'"></div><div class="field"><label>Jabatan dalam unit</label><input name="position_title" maxlength="100" value="'+esc(person.position_title||"Anggota")+'"></div><div class="form-grid"><div class="field"><label>NIM</label><input name="nim" maxlength="40" value="'+esc(person.nim||"")+'"></div><div class="field"><label>Angkatan</label><input name="cohort" maxlength="20" value="'+esc(person.cohort||"")+'"></div></div><div class="form-actions"><button class="btn" type="submit">Simpan perubahan</button></div></form>';
+  document.body.appendChild(overlay);
+  overlay.addEventListener("click",e=>{if(e.target===overlay)overlay.remove();});
+  $("#close-edit-roster",overlay).addEventListener("click",()=>overlay.remove());
+  $("#edit-roster-form",overlay).addEventListener("submit",async e=>{
+    e.preventDefault();
+    const values=Object.fromEntries(new FormData(e.currentTarget).entries());
+    const button=e.currentTarget.querySelector('button[type="submit"]');button.disabled=true;
+    try {
+      await api("member_roster?id=eq."+encodeURIComponent(id),{method:"PATCH",body:JSON.stringify({
+        full_name:values.full_name.trim(),position_title:values.position_title||"Anggota",
+        nim:values.nim||null,cohort:values.cohort||null
+      })});
+      overlay.remove();toast("Data anggota diperbarui.");await loadData();renderShell();
+    } catch(error){toast(error.message,true);button.disabled=false;}
+  });
+}
+function printRosterReport(id) {
+  const person=state.roster.find(m=>m.id===id);
+  if(!person) return;
+  const evaluations=state.evaluations.filter(e=>e.subject_roster_id===id && e.period_id===person.period_id)
+    .sort((a,b)=>new Date(b.created_at)-new Date(a.created_at));
+  const period=state.periods.find(p=>p.id===person.period_id);
+  const unit=unitFor(person.unit_id);
+  const evalHtml=evaluations.length?evaluations.map((e,index)=>{
+    const scores=state.scores.filter(s=>s.evaluation_id===e.id);
+    let weighted=0,total=0;
+    const rows=scores.map(s=>{
+      const criterion=state.criteria.find(c=>c.id===s.criterion_id);
+      if(!criterion) return "";
+      weighted+=Number(s.score)*Number(criterion.weight);total+=Number(criterion.weight);
+      return '<tr><td>'+esc(criterion.name)+'</td><td>'+Number(criterion.weight)+'%</td><td>'+Number(s.score)+'/5</td></tr>';
+    }).join("");
+    const final=total?(weighted/total*20).toFixed(1):"—";
+    return '<section class="entry"><h2>Penilaian '+(index+1)+' · '+dateText(e.created_at)+'</h2><p class="score">Nilai akhir: <strong>'+final+(final==="—"?"":" / 100")+'</strong></p><table><thead><tr><th>Indikator</th><th>Bobot</th><th>Skor</th></tr></thead><tbody>'+rows+'</tbody></table><h3>Kekuatan</h3><p>'+esc(e.strengths||"—")+'</p><h3>Hal yang perlu ditingkatkan</h3><p>'+esc(e.improvements||"—")+'</p><h3>Kendala</h3><p>'+esc(e.obstacles||"—")+'</p><h3>Rekomendasi</h3><p>'+esc(e.recommendations||"—")+'</p></section>';
+  }).join(""):'<p>Belum ada penilaian untuk anggota ini.</p>';
+  const popup=window.open("","_blank");
+  if(!popup){toast("Izinkan pop-up browser untuk mencetak rapor.",true);return;}
+  popup.document.write('<!doctype html><html lang="id"><head><meta charset="utf-8"><title>Rapor - '+esc(person.full_name)+'</title><style>body{font:14px Arial,sans-serif;color:#17251e;margin:32px;line-height:1.5}h1{font-size:24px;margin-bottom:4px}h2{font-size:17px;border-bottom:1px solid #bbb;padding-bottom:6px}h3{font-size:13px;margin:12px 0 2px}p{margin:2px 0 8px}.meta{margin:18px 0;padding:14px;border:1px solid #ccc;border-radius:8px}.score{font-size:18px}table{width:100%;border-collapse:collapse;margin:10px 0}th,td{text-align:left;border:1px solid #ccc;padding:7px}.entry{page-break-inside:avoid;border-top:2px solid #234c37;margin-top:22px;padding-top:4px}.muted{color:#66736b}@media print{body{margin:16mm}.entry{break-inside:avoid}}</style></head><body><h1>RAPOR ANGGOTA PMII FEBI</h1><p class="muted">Sistem Informasi Evaluasi dan Penilaian Kepengurusan</p><div class="meta"><p><b>Nama:</b> '+esc(person.full_name)+'</p><p><b>NIM:</b> '+esc(person.nim||"—")+'</p><p><b>Angkatan:</b> '+esc(person.cohort||"—")+'</p><p><b>Jabatan:</b> '+esc(person.position_title||"Anggota")+'</p><p><b>Unit:</b> '+esc(unit?.name||"—")+'</p><p><b>Periode:</b> '+esc(period?.name||"—")+'</p></div>'+evalHtml+'<p class="muted" style="margin-top:36px">Dokumen dihasilkan dari SIGAP PMII FEBI.</p><script>window.onload=()=>window.print();<\/script></body></html>');
+  popup.document.close();
+}
 function renderAdmin() {
   const pending=state.profiles.filter(p=>p.account_status==="pending");
   const approved=state.profiles.filter(p=>p.account_status==="active");
@@ -472,6 +550,24 @@ document.addEventListener("click",async event=>{
     } catch(e){toast(e.message,true);control.disabled=false;}
     return;
   }
+  const editRoster=event.target.closest("[data-edit-roster]");
+  if(editRoster){openRosterEditor(editRoster.dataset.editRoster);return;}
+  const printRoster=event.target.closest("[data-print-roster]");
+  if(printRoster){printRosterReport(printRoster.dataset.printRoster);return;}
+  const toggleRoster=event.target.closest("[data-toggle-roster]");
+  if(toggleRoster){
+    const person=state.roster.find(m=>m.id===toggleRoster.dataset.toggleRoster);
+    if(!person) return;
+    const next=toggleRoster.dataset.active==="true";
+    if(!next && !window.confirm("Arsipkan "+person.full_name+"? Data rapor yang sudah ada tetap tersimpan.")) return;
+    toggleRoster.disabled=true;
+    try {
+      await api("member_roster?id=eq."+encodeURIComponent(person.id),{method:"PATCH",body:JSON.stringify({is_active:next})});
+      toast(next?"Anggota diaktifkan kembali.":"Anggota diarsipkan; riwayat rapor tetap tersimpan.");
+      await loadData();renderShell();
+    } catch(e){toast(e.message,true);toggleRoster.disabled=false;}
+    return;
+  }
   const review=event.target.closest("[data-review-evaluation]");
   if(review){review.disabled=true;try{await api("evaluations?id=eq."+review.dataset.reviewEvaluation,{method:"PATCH",body:JSON.stringify({status:"reviewed",reviewed_at:new Date().toISOString()})});toast("Penilaian telah ditandai ditinjau.");await loadData();renderShell();}catch(e){toast(e.message,true);review.disabled=false;}return;}
   const editReport=event.target.closest("[data-edit-report]");
@@ -512,6 +608,7 @@ document.addEventListener("submit",async event=>{
   const handlers={
     "auth-form":()=>handleAuth(form),
     "evaluation-form":()=>submitEvaluation(form),
+    "roster-form":()=>saveRoster(form),
     "report-form":()=>submitReport(form),
     "period-form":()=>createPeriod(form),
     "assign-form":()=>assignRole(form)
