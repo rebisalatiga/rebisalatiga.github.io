@@ -5,7 +5,7 @@ const root = document.getElementById("app");
 const state = {
   session: null, user: null, profile: null, profiles: [], units: [], periods: [],
   memberships: [], roster: [], criteria: [], evaluations: [], scores: [], reports: [],
-  publicStructure: [], publicMode: false,
+  publicStructure: [], publicMode: false, evaluationMode: "individual",
   view: "overview", periodId: "", authMode: "login", busy: false, searchQuery: ""
 };
 const $ = (selector, scope=document) => scope.querySelector(selector);
@@ -404,7 +404,7 @@ function canEvaluateTarget(target) {
   if(!target) return false;
   return target.user_id===state.user?.id || canManageUnit(target.unit_id);
 }
-function evaluationTargets() {
+function individualEvaluationTargets() {
   const registered=activeMemberships()
     .filter(m=>canEvaluateTarget(m))
     .map(m=>({
@@ -417,11 +417,16 @@ function evaluationTargets() {
       ref:"roster:"+m.id,target_type:"roster",target_id:m.id,
       full_name:m.full_name,unit_id:m.unit_id,position_title:m.position_title||"Anggota"
     }));
-  const bureaus=manageableUnits().filter(unit=>unit.unit_type==="bureau").map(unit=>({
-    ref:"unit:"+unit.id,target_type:"unit",target_id:unit.id,
-    full_name:unit.name,unit_id:unit.id,position_title:"Penilaian kinerja biro"
-  }));
-  return [...nominal,...registered,...bureaus].sort((a,b)=>a.full_name.localeCompare(b.full_name,"id"));
+  return [...nominal,...registered].sort((a,b)=>a.full_name.localeCompare(b.full_name,"id"));
+}
+function bureauEvaluationTargets() {
+  return manageableUnits()
+    .filter(unit=>unit.unit_type==="bureau")
+    .map(unit=>({
+      ref:"unit:"+unit.id,target_type:"unit",target_id:unit.id,
+      full_name:unit.name,unit_id:unit.id,position_title:"Penilaian kinerja biro"
+    }))
+    .sort((a,b)=>a.full_name.localeCompare(b.full_name,"id"));
 }
 function renderEvaluationCard(e) {
   const rosterTarget=e.subject_roster_id?state.roster.find(m=>m.id===e.subject_roster_id):null;
@@ -439,26 +444,69 @@ function renderEvaluationCard(e) {
   const bureauReportAction=bureauTarget?'<div style="margin-top:12px"><button class="btn btn-ghost" data-print-bureau="'+bureauTarget.id+'">Cetak rapor biro</button></div>':"";
   return '<article class="eval-card"><div class="eval-meta"><div><h4>'+esc(displayName)+'</h4><div class="tiny muted">'+esc(displayUnit)+' · '+esc(displayPosition)+' · Dinilai oleh '+esc(evaluator?memberName(evaluator):"Pengurus")+'</div></div><span class="badge '+(e.status==="submitted"?"gold":e.status==="reviewed"?"":"grey")+'">'+esc(e.status==="submitted"?"Terkirim":e.status==="reviewed"?"Ditinjau":"Draft")+'</span></div><p>'+esc(e.strengths||"Belum ada catatan kekuatan.")+'</p><div class="small"><strong>Nilai akhir: '+score+(score==="—"?"":" / 100")+'</strong> <span class="muted">· '+dateText(e.created_at)+'</span></div><div class="tiny muted" style="margin-top:7px">Perbaikan: '+esc(e.improvements||"—")+' · Kendala: '+esc(e.obstacles||"—")+' · Rekomendasi: '+esc(e.recommendations||"—")+'</div>'+reviewAction+bureauReportAction+'</article>';
 }
+function renderEvaluationForm(kind,targets,criteria,p,evaluator) {
+  const isBureau=kind==="bureau";
+  const formId=isBureau?"bureau-evaluation-form":"individual-evaluation-form";
+  const title=isBureau?"Buat penilaian kinerja biro":"Buat penilaian individu";
+  const description=isBureau
+    ?"Nilai kinerja satu biro sebagai unit kerja, bukan nilai personal anggota."
+    :"Nilai kinerja satu orang pengurus atau anggota, termasuk anggota yang belum memiliki akun SIGAP.";
+  const selectLabel=isBureau?"Biro yang dinilai":"Individu yang dinilai";
+  const selectPlaceholder=isBureau?"Pilih biro":"Pilih nama pengurus atau anggota";
+  const targetOptions=targets.map(item=>
+    '<option value="'+item.ref+'">'+(isBureau?"Biro · ":"")+esc(item.full_name)+' · '+esc(unitFor(isBureau?unitFor(item.unit_id)?.parent_id:item.unit_id)?.name||"Unit")+(isBureau?"":" · "+esc(item.position_title))+'</option>'
+  ).join("");
+  const emptyMessage=isBureau
+    ?"Belum ada biro dalam lingkup kewenangan Anda yang dapat dinilai."
+    :"Belum ada individu dalam lingkup kewenangan Anda yang dapat dinilai.";
+  if(!evaluator || !targets.length) return '<section class="panel"><div class="panel-head"><div><h3>'+title+'</h3><p>'+description+'</p></div></div><div class="empty">'+emptyMessage+'</div></section>';
+  return '<section class="panel evaluation-form-panel"><div class="panel-head"><div><h3>'+title+'</h3><p>'+description+'</p></div><span class="badge gold">'+esc(p.name)+'</span></div>'+
+    '<form id="'+formId+'" data-evaluation-kind="'+kind+'">'+
+    '<div class="field"><label>'+selectLabel+'</label><select name="subject_ref" required><option value="">'+selectPlaceholder+'</option>'+targetOptions+'</select></div>'+
+    '<div class="notice">'+(isBureau
+      ?"Indikator dan catatan berikut menilai kinerja biro secara keseluruhan. Untuk menilai koordinator atau anggota tertentu, gunakan Penilaian Individu."
+      :"Formulir ini hanya menerima sasaran individu. Untuk menilai kinerja satu biro secara keseluruhan, gunakan Penilaian Biro.")+' Skala nilai 1–5; bobot indikator berjumlah 100%.</div>'+
+    criteria.map(c=>'<div class="criterion-row"><div><strong>'+esc(c.name)+' <span class="muted">('+Number(c.weight)+'%)</span></strong><small>'+esc(c.description||"")+'</small></div><select name="score_'+c.id+'" required><option value="3">3 · Cukup</option><option value="1">1 · Sangat kurang</option><option value="2">2 · Kurang</option><option value="4">4 · Baik</option><option value="5">5 · Sangat baik</option></select></div>').join("")+
+    '<div class="field"><label>Hal yang sudah berjalan baik</label><textarea name="strengths" placeholder="'+(isBureau?"Tuliskan capaian utama dan praktik baik biro…":"Tuliskan capaian atau praktik baik individu…")+'"></textarea></div>'+
+    '<div class="field"><label>Hal yang perlu ditingkatkan</label><textarea name="improvements" placeholder="Tuliskan hal yang perlu diperbaiki…"></textarea></div>'+
+    '<div class="field"><label>Kendala yang dihadapi</label><textarea name="obstacles" placeholder="Tuliskan kendala yang ditemukan…"></textarea></div>'+
+    '<div class="field"><label>Rekomendasi dan target berikutnya</label><textarea name="recommendations" placeholder="Tuliskan langkah perbaikan…"></textarea></div>'+
+    '<div class="form-actions"><button class="btn" type="submit">'+(isBureau?"Kirim penilaian biro":"Kirim penilaian individu")+'</button></div></form></section>';
+}
 function renderEvaluations() {
   const p=periodActive();
-  if(!p) return pageHeading("Penilaian & evaluasi","Penilaian kinerja pengurus berbasis indikator dan evaluasi tertulis.")+'<div class="empty"><strong>Belum ada periode kepengurusan</strong>Admin perlu membuat dan mengaktifkan periode terlebih dahulu.</div>';
-  const criteria=state.criteria.filter(c=>c.period_id===null || c.period_id===p.id);
-  const targets=evaluationTargets();
+  const mode=state.evaluationMode==="bureau"?"bureau":"individual";
+  const isBureau=mode==="bureau";
+  const individualTargets=individualEvaluationTargets();
+  const bureauTargets=bureauEvaluationTargets();
+  const criteria=state.criteria.filter(c=>c.period_id===null || c.period_id===p?.id);
   const evaluator=ownEvaluatorMembership();
   const query=(state.searchQuery||"").trim().toLocaleLowerCase("id");
-  const list=state.evaluations.filter(e=>{
-    if(e.period_id!==p.id) return false;
+  const individualList=state.evaluations.filter(e=>e.period_id===p?.id && !e.subject_unit_id && (e.subject_membership_id || e.subject_roster_id));
+  const bureauList=state.evaluations.filter(e=>e.period_id===p?.id && !!e.subject_unit_id);
+  const filterList=items=>items.filter(e=>{
     if(!query) return true;
     const person=evaluationPerson(e);
     return [person.name,person.unit,person.position,person.evaluator].some(v=>String(v||"").toLocaleLowerCase("id").includes(query));
   });
-  const form= evaluator && targets.length ? '<section class="panel"><div class="panel-head"><div><h3>Buat penilaian baru</h3><p>Nama anggota dapat dinilai meskipun belum mempunyai akun SIGAP.</p></div><span class="badge gold">'+esc(p.name)+'</span></div><form id="evaluation-form"><div class="field"><label>Pengurus, anggota, atau biro yang dinilai</label><select name="subject_ref" required><option value="">Pilih nama atau biro</option>'+targets.map(m=>'<option value="'+m.ref+'">'+(m.target_type==="unit"?"Biro · ":"")+esc(m.full_name)+' · '+esc(unitFor(m.unit_id)?.name||"Unit")+' · '+esc(m.position_title)+'</option>').join("")+'</select></div>'+
-    '<div class="notice">Penilaian dapat dibuat untuk pengurus berakun, anggota nominal tanpa akun, atau kinerja biro secara keseluruhan. Skala nilai 1–5; bobot indikator berjumlah 100%.</div>'+
-    criteria.map(c=>'<div class="criterion-row"><div><strong>'+esc(c.name)+' <span class="muted">('+Number(c.weight)+'%)</span></strong><small>'+esc(c.description||"")+'</small></div><select name="score_'+c.id+'" required><option value="3">3 · Cukup</option><option value="1">1 · Sangat kurang</option><option value="2">2 · Kurang</option><option value="4">4 · Baik</option><option value="5">5 · Sangat baik</option></select></div>').join("")+
-    '<div class="field"><label>Hal yang sudah berjalan baik</label><textarea name="strengths" placeholder="Tuliskan capaian atau praktik baik…"></textarea></div><div class="field"><label>Hal yang perlu ditingkatkan</label><textarea name="improvements" placeholder="Tuliskan kekurangan yang perlu diperbaiki…"></textarea></div><div class="field"><label>Kendala yang dihadapi</label><textarea name="obstacles" placeholder="Tuliskan kendala yang ditemukan…"></textarea></div><div class="field"><label>Rekomendasi dan target berikutnya</label><textarea name="recommendations" placeholder="Tuliskan langkah perbaikan…"></textarea></div><div class="form-actions"><button class="btn" type="submit">Kirim penilaian</button></div></form></section>' :
-    '<div class="notice warn">Belum ada penugasan aktif yang dapat digunakan untuk menilai pada periode ini. Anggota dapat melihat penilaian diri setelah memiliki penugasan.</div>';
-  return pageHeading("Penilaian & evaluasi","Nilai kinerja berdasarkan indikator, bukti, dan catatan pembinaan.")+
-    '<div class="split"><div class="stack">'+form+'</div><section class="panel"><div class="panel-head"><div><h3>Riwayat penilaian</h3><p>Penilaian yang dapat Anda akses</p></div><span class="badge">'+list.length+' catatan</span></div><div class="eval-grid">'+(list.length?list.map(renderEvaluationCard).join(""):'<div class="empty"><strong>Belum ada penilaian</strong>Penilaian akan muncul di sini setelah dikirim.</div>')+'</div></section></div>';
+  const activeList=filterList(isBureau?bureauList:individualList);
+  const activeTargets=isBureau?bureauTargets:individualTargets;
+  if(!p) return pageHeading("Penilaian & evaluasi","Penilaian individu dan kinerja biro dikelola pada bagian terpisah.")+
+    '<div class="empty"><strong>Belum ada periode kepengurusan</strong>Admin perlu membuat dan mengaktifkan periode terlebih dahulu.</div>';
+  const form=renderEvaluationForm(mode,activeTargets,criteria,p,evaluator);
+  const tabs='<div class="evaluation-switcher" role="tablist" aria-label="Jenis penilaian">'+
+    '<button type="button" class="evaluation-tab '+(!isBureau?"active":"")+'" data-evaluation-mode="individual" role="tab" aria-selected="'+(!isBureau)+'"><span class="evaluation-tab-icon">♙</span><span><strong>Penilaian Individu</strong><small>Pengurus dan anggota per orang</small></span><b>'+individualList.length+'</b></button>'+
+    '<button type="button" class="evaluation-tab '+(isBureau?"active":"")+'" data-evaluation-mode="bureau" role="tab" aria-selected="'+isBureau+'"><span class="evaluation-tab-icon">▦</span><span><strong>Penilaian Biro</strong><small>Kinerja unit biro secara keseluruhan</small></span><b>'+bureauList.length+'</b></button>'+
+    '</div>';
+  const historyTitle=isBureau?"Riwayat penilaian biro":"Riwayat penilaian individu";
+  const historyDescription=isBureau
+    ?"Hanya penilaian kinerja biro yang berada dalam lingkup akses Anda."
+    :"Hanya penilaian individu yang berada dalam lingkup akses Anda.";
+  const history='<section class="panel evaluation-history-panel"><div class="panel-head"><div><h3>'+historyTitle+'</h3><p>'+historyDescription+'</p></div><span class="badge">'+activeList.length+' catatan</span></div>'+
+    '<div class="eval-grid">'+(activeList.length?activeList.map(renderEvaluationCard).join(""):'<div class="empty"><strong>Belum ada riwayat '+(isBureau?"penilaian biro":"penilaian individu")+'</strong>'+(isBureau?"Penilaian kinerja biro akan muncul setelah dikirim.":"Penilaian setiap individu akan muncul setelah dikirim.")+'</div>')+'</div></section>';
+  return pageHeading("Penilaian & evaluasi","Pilih penilaian individu atau penilaian kinerja biro. Keduanya memiliki formulir dan riwayat masing-masing.")+
+    tabs+
+    '<div class="evaluation-workspace"><div class="stack">'+form+'</div>'+history+'</div>';
 }
 function renderReportCard(r) {
   const unit=unitFor(r.unit_id);
@@ -687,12 +735,16 @@ async function handleAuth(form) {
     toast(signup?"Akun berhasil dibuat.":"Berhasil masuk ke SIGAP.");
   }
 }
-async function submitEvaluation(form) {
+async function submitEvaluation(form,expectedKind) {
   const values=Object.fromEntries(new FormData(form).entries());
   const p=periodActive(); const evaluator=ownEvaluatorMembership();
+  const kind=expectedKind==="bureau"?"bureau":"individual";
   if(!p || !evaluator) throw new Error("Periode atau penugasan evaluator belum tersedia.");
   const [subjectType,subjectId]=String(values.subject_ref||"").split(":");
-  if(!subjectId || !["roster","membership","unit"].includes(subjectType)) throw new Error("Pilih pengurus, anggota, atau biro yang akan dinilai.");
+  const valid=kind==="bureau"?subjectType==="unit":["roster","membership"].includes(subjectType);
+  if(!subjectId || !valid) throw new Error(kind==="bureau"?"Pilih biro pada formulir Penilaian Biro.":"Pilih individu pada formulir Penilaian Individu.");
+  const allowedTargets=kind==="bureau"?bureauEvaluationTargets():individualEvaluationTargets();
+  if(!allowedTargets.some(target=>target.ref===values.subject_ref)) throw new Error("Sasaran penilaian berada di luar lingkup kewenangan Anda.");
   const criteria=state.criteria.filter(c=>c.period_id===null || c.period_id===p.id);
   const created=await api("evaluations",{method:"POST",body:JSON.stringify({
     period_id:p.id,evaluator_membership_id:evaluator.id,
@@ -706,8 +758,8 @@ async function submitEvaluation(form) {
   const scores=criteria.map(c=>({evaluation_id:evaluation.id,criterion_id:c.id,score:Number(values["score_"+c.id]||3)}));
   if(scores.length) await api("evaluation_scores",{method:"POST",body:JSON.stringify(scores)});
   await api("evaluations?id=eq."+evaluation.id,{method:"PATCH",body:JSON.stringify({status:"submitted",submitted_at:new Date().toISOString()})});
-  toast("Penilaian berhasil dikirim.");
-  await loadData(); state.view="evaluations"; render();
+  toast(kind==="bureau"?"Penilaian biro berhasil dikirim.":"Penilaian individu berhasil dikirim.");
+  await loadData(); state.evaluationMode=kind; state.view="evaluations"; renderShell();
 }
 async function submitReport(form) {
   const values=Object.fromEntries(new FormData(form).entries());
@@ -758,6 +810,12 @@ async function assignRole(form) {
 }
 document.addEventListener("click",async event=>{
   if(event.target.closest("[data-print-organization]")){window.print();return;}
+  const evaluationMode=event.target.closest("[data-evaluation-mode]");
+  if(evaluationMode){
+    state.evaluationMode=evaluationMode.dataset.evaluationMode==="bureau"?"bureau":"individual";
+    renderShell();
+    return;
+  }
   if(event.target.closest("#public-structure")){
     const trigger=event.target.closest("#public-structure");trigger.disabled=true;
     try{await loadPublicStructure();}catch(e){toast(e.message,true);trigger.disabled=false;}
@@ -870,7 +928,8 @@ document.addEventListener("submit",async event=>{
   const form=event.target;
   const handlers={
     "auth-form":()=>handleAuth(form),
-    "evaluation-form":()=>submitEvaluation(form),
+    "individual-evaluation-form":()=>submitEvaluation(form,"individual"),
+    "bureau-evaluation-form":()=>submitEvaluation(form,"bureau"),
     "roster-form":()=>saveRoster(form),
     "report-form":()=>submitReport(form),
     "period-form":()=>createPeriod(form),
