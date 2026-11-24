@@ -53,6 +53,18 @@ async function api(path, options={}) {
   }
   return payload;
 }
+async function publicApi(path) {
+  const response=await fetch(API+"/rest/v1/"+path,{
+    method:"GET",
+    headers:{"apikey":KEY,"Content-Type":"application/json"}
+  });
+  const payload=await response.json().catch(()=>null);
+  if(!response.ok) {
+    const message=payload?.message || payload?.details || payload?.hint || "Direktori publik gagal dimuat ("+response.status+").";
+    throw new Error(message);
+  }
+  return payload;
+}
 function saveSession(session) {
   state.session=session;
   if(session) sessionStorage.setItem("sigap-session",JSON.stringify(session));
@@ -106,7 +118,7 @@ async function loadData() {
     api("evaluations?select=*&order=created_at.desc"),
     api("evaluation_scores?select=*&order=created_at.desc"),
     api("activity_reports?select=*&order=created_at.desc"),
-    api("public_organization_structure?select=*&order=sort_order.asc,person_name.asc")
+    publicApi("public_organization_structure?select=*&order=sort_order.asc,person_name.asc")
   ]);
   [state.profiles,state.units,state.periods,state.memberships,state.roster,state.criteria,state.evaluations,state.scores,state.reports,state.publicStructure]=results;
   if(!state.periodId || !state.periods.some(p=>p.id===state.periodId)) {
@@ -114,7 +126,7 @@ async function loadData() {
   }
 }
 async function loadPublicStructure() {
-  const rows=await api("public_organization_structure?select=*&order=sort_order.asc,person_name.asc");
+  const rows=await publicApi("public_organization_structure?select=*&order=sort_order.asc,person_name.asc");
   state.publicStructure=rows||[];
   const byId=new Map();
   for(const row of state.publicStructure) {
@@ -135,7 +147,7 @@ async function loadProfile() {
 function renderAuth() {
   const signup=state.authMode==="signup";
   root.innerHTML='<div class="auth-layout">'+
-    '<section class="auth-hero"><div class="brand-lockup"><div class="brand-logo auth-logo"><img src="./assets/logo-pmii-febi.jpg" alt="Logo PMII Rayon Ekonomi Bisnis Islam"></div><div><strong>SIGAP PMII FEBI</strong><small>Sistem Informasi Evaluasi Kepengurusan</small></div></div>'+
+    '<section class="auth-hero"><div class="brand-lockup"><div class="brand-logo auth-logo"><img src="https://1.bp.blogspot.com/-_LPIjxug5bs/W1YpWUAw0FI/AAAAAAAAAac/26D9u4GoFe0qM9sdOUpfSyV0MH4RO1y0QCLcBGAs/s1600/logo_pmii_hd.png" alt="Logo PMII Rayon Ekonomi Bisnis Islam"></div><div><strong>SIGAP PMII FEBI</strong><small>Sistem Informasi Evaluasi Kepengurusan</small></div></div>'+
     '<div class="hero-copy"><div class="eyebrow">Bergerak · Berproses · Bertumbuh</div><h1>Merawat amanah.<br>Menumbuhkan gerakan.</h1><p>Ruang digital pengurus PMII Fakultas Ekonomi dan Bisnis Islam untuk mengelola struktur, mengukur kinerja, dan menyusun evaluasi bersama.</p></div>'+
     '<div class="hero-foot">PERGERAKAN MAHASISWA ISLAM INDONESIA · PMII FEBI</div></section>'+
     '<section class="auth-panel"><form class="auth-card" id="auth-form"><div class="eyebrow">Ruang internal organisasi</div><h2>'+(signup?"Buat akun pengurus":"Selamat datang kembali")+'</h2><p>'+(signup?"Daftarkan akun. Ketua Rayon, Sekretaris Umum, Bendahara Umum, atau Kepala Bidang akan memeriksa pendaftaran Anda.":"Masuk untuk melanjutkan proses dan amanah kepengurusan.")+'</p>'+
@@ -150,7 +162,7 @@ function renderAuth() {
 function renderPending() {
   const status=state.profile?.account_status || "pending";
   const message=status==="rejected"?"Pendaftaran akun ditolak. Silakan hubungi Ketua Rayon atau pengurus yang memeriksa pendaftaran.":status==="suspended"?"Akses akun sedang dinonaktifkan. Silakan hubungi Admin Sistem.":"Akun Anda sudah terdaftar. Tunggu persetujuan Ketua Rayon, Sekretaris Umum, Bendahara Umum, atau Kepala Bidang. Anda tidak perlu memverifikasi email.";
-  root.innerHTML='<div class="pending-wrap"><section class="pending-card"><div class="brand-logo pending-logo"><img src="./assets/logo-pmii-febi.jpg" alt="Logo PMII Rayon Ekonomi Bisnis Islam"></div><div class="pending-icon">⌛</div><div class="eyebrow">SIGAP PMII FEBI</div><h2 style="margin:10px 0">Akun dalam proses</h2><p class="muted" style="line-height:1.7">'+esc(message)+'</p><div style="margin-top:24px"><button class="btn btn-ghost" id="refresh-status">Periksa status lagi</button> <button class="btn" id="logout">Keluar</button></div></section></div>';
+  root.innerHTML='<div class="pending-wrap"><section class="pending-card"><div class="brand-logo pending-logo"><img src="https://1.bp.blogspot.com/-_LPIjxug5bs/W1YpWUAw0FI/AAAAAAAAAac/26D9u4GoFe0qM9sdOUpfSyV0MH4RO1y0QCLcBGAs/s1600/logo_pmii_hd.png" alt="Logo PMII Rayon Ekonomi Bisnis Islam"></div><div class="pending-icon">⌛</div><div class="eyebrow">SIGAP PMII FEBI</div><h2 style="margin:10px 0">Akun dalam proses</h2><p class="muted" style="line-height:1.7">'+esc(message)+'</p><div style="margin-top:24px"><button class="btn btn-ghost" id="refresh-status">Periksa status lagi</button> <button class="btn" id="logout">Keluar</button></div></section></div>';
 }
 function navItem(view,icon,label) {
   return '<button class="nav-item '+(state.view===view?"active":"")+'" data-view="'+view+'"><span class="nav-ico">'+icon+'</span>'+label+'</button>';
@@ -159,7 +171,7 @@ function renderShell() {
   const p=periodActive();
   const profile=state.profile || {};
   const firstRole=ownMemberships()[0]?.role || (isAdmin()?"admin":"anggota");
-  root.innerHTML='<div class="app-shell"><aside class="sidebar" id="sidebar"><div class="side-brand"><div class="brand-logo side-logo"><img src="./assets/logo-pmii-febi.jpg" alt="Logo PMII Rayon Ekonomi Bisnis Islam"></div><div><strong>SIGAP PMII FEBI</strong><small>Ruang kerja kepengurusan</small></div></div>'+
+  root.innerHTML='<div class="app-shell"><aside class="sidebar" id="sidebar"><div class="side-brand"><div class="brand-logo side-logo"><img src="https://1.bp.blogspot.com/-_LPIjxug5bs/W1YpWUAw0FI/AAAAAAAAAac/26D9u4GoFe0qM9sdOUpfSyV0MH4RO1y0QCLcBGAs/s1600/logo_pmii_hd.png" alt="Logo PMII Rayon Ekonomi Bisnis Islam"></div><div><strong>SIGAP PMII FEBI</strong><small>Ruang kerja kepengurusan</small></div></div>'+
     '<div class="nav-label">Menu utama</div><nav class="nav-list">'+
       navItem("overview","⌂","Dashboard")+navItem("structure","⌘","Struktur organisasi")+navItem("evaluations","✓","Penilaian & evaluasi")+navItem("reports","▤","Laporan kegiatan")+
     '</nav>'+(manageableUnits().length?'<div class="nav-label">Data kepengurusan</div><nav class="nav-list">'+navItem("roster","♧","Data anggota & rapor")+'</nav>':'')+(canApproveAccounts()?'<div class="nav-label">Persetujuan</div><nav class="nav-list">'+navItem("approvals","✓","Persetujuan akun")+'</nav>':'')+(isAdmin()?'<div class="nav-label">Administrasi sistem</div><nav class="nav-list">'+navItem("admin","⚙","Panel admin")+'</nav>':'')+
