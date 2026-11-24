@@ -612,3 +612,23 @@ button,input,select,textarea{max-width:100%}
   .criterion-row{grid-template-columns:minmax(0,1fr) 88px;font-size:10px}
   .org-directory-actions{flex-direction:column}
 }
+
+
+/* Restrained, institutional call-to-action for the public organization chart. */
+.auth-structure-action{width:min(100%,340px);margin-top:clamp(14px,2vh,22px)}
+.auth-structure-button{
+  width:100%;min-height:48px;display:flex;align-items:center;justify-content:space-between;gap:18px;
+  padding:0 17px;border:1px solid #dfb600;border-radius:8px;background:#f2c500;color:#111a3d;
+  box-shadow:none;text-align:left;font-size:12px;font-weight:750;letter-spacing:.005em;
+  transition:background-color .16s,border-color .16s;
+}
+.auth-structure-button:hover{background:#e4bb00;border-color:#d4ad00;transform:none}
+.auth-structure-button:focus-visible{outline:2px solid #fff;outline-offset:3px}
+.auth-structure-arrow{font-size:17px;line-height:1;color:#26365c}
+@media(max-width:720px){
+  .auth-structure-action{width:min(100%,460px);margin-top:7px}
+  .auth-structure-button{min-height:46px;padding:0 15px;font-size:11px}
+}
+@media(max-width:380px){
+  .auth-structure-button{min-height:44px;padding:0 13px}
+}
