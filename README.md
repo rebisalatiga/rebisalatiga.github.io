@@ -57,3 +57,8 @@ Pengaturan GitHub Pages:
 Publishable key boleh berada di frontend. **Jangan pernah** meletakkan Supabase service-role key atau secret key di repository frontend. Seluruh tabel aplikasi dilindungi RLS; pemberian role dilakukan melalui database oleh admin.
 
 Lihat dokumentasi Supabase untuk [Row Level Security](https://supabase.com/docs/guides/database/postgres/row-level-security). Skema penilaian biro dan pembatasan lingkup jabatan ada di [supabase/03_public_structure_bureau_scoring_hierarchy.sql](supabase/03_public_structure_bureau_scoring_hierarchy.sql). Daftar pengurus 2026/2027 disimpan pada [supabase/04_seed_pengurus_2026_2027.sql](supabase/04_seed_pengurus_2026_2027.sql), sedangkan proyeksi direktori publik yang aman dan tersinkron otomatis ada di [supabase/05_public_directory_projection.sql](supabase/05_public_directory_projection.sql).
+
+
+### Atribusi ikon PMII
+
+Favicon SVG/PNG di repositori merupakan ikon ringkas buatan SIGAP yang merujuk pada lambang PMII. Gambar lambang untuk pratinjau tautan menggunakan [PMII Logo.png di Wikimedia Commons](https://commons.wikimedia.org/wiki/File:PMII_Logo.png), karya Gilang Arianto, berlisensi [CC BY-SA 3.0](https://creativecommons.org/licenses/by-sa/3.0/).
