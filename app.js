@@ -184,7 +184,7 @@ function renderStructure() {
   const children=parent=>state.units.filter(u=>u.parent_id===parent).sort((a,b)=>a.sort_order-b.sort_order);
   const renderUnit=(unit,level)=>'<article class="unit-card" style="margin-left:'+Math.min(level*17,50)+'px"><div class="unit-row"><div class="unit-title"><div class="unit-symbol">'+(unit.unit_type==="bureau"?"◈":unit.unit_type==="field"?"⌘":unit.unit_type==="executive"?"▤":"✦")+'</div><div><strong>'+esc(unit.name)+'</strong><small>'+({rayon:"Struktur rayon",executive:"Unsur eksekutif",field:"Kepala bidang",bureau:"Biro"}[unit.unit_type]||"Unit")+'</small></div></div><span class="badge '+(unit.unit_type==="field"?"gold":"")+'">'+({rayon:"Rayon",executive:"Eksekutif",field:"Bidang",bureau:"Biro"}[unit.unit_type])+'</span></div>'+personChips(unit)+'</article>'+children(unit.id).map(child=>renderUnit(child,level+1)).join("");
   return pageHeading("Struktur organisasi","Peta kepengurusan PMII FEBI dari Ketua Rayon hingga koordinator dan anggota.")+
-    '<div class="notice">Struktur organisasi mengikuti susunan rayon, sekretariat dan bendahara umum, tiga bidang, serta sembilan biro. Jabatan aktual akan terlihat setelah admin menetapkan penempatan pengurus.</div><div class="unit-list">'+renderUnit(rootUnit,0)+'</div>';
+    '<div class="notice">Setiap bidang memiliki Kepala Bidang dan Sekretaris Bidang yang sejajar, dengan biro-biro di bawahnya. Nama anggota nominal juga ditampilkan di struktur meskipun belum memiliki akun SIGAP.</div><div class="unit-list">'+renderUnit(rootUnit,0)+'</div>';
 }
 function descendantsOf(unitId) {
   const found=new Set([unitId]); let changed=true;
