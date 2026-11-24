@@ -13,7 +13,8 @@ SIGAP membantu pengurus mengelola struktur rayon, bidang, biro, keanggotaan, per
 
 ## Fitur aplikasi
 
-- Registrasi, login, dan persetujuan akun admin.
+- Registrasi tanpa verifikasi email; akun baru menunggu persetujuan.
+- Persetujuan pendaftaran oleh Ketua Rayon, Sekretaris Umum, Bendahara Umum, atau Kepala Bidang; koordinator biro dan anggota tidak dapat menyetujui.
 - Pengelolaan role dan unit organisasi sesuai struktur PMII FEBI.
 - Periode kepengurusan.
 - Penilaian dengan enam indikator berbobot dan skala 1–5.
@@ -42,9 +43,9 @@ Pengaturan GitHub Pages:
 
 1. Periksa konfigurasi Supabase pada `config.js`. URL dan publishable key proyek sudah diisi.
 2. Daftar melalui website menggunakan email admin pertama.
-3. Verifikasi email.
+3. Email pendaftar baru otomatis dikonfirmasi oleh database, tetapi akun tetap berstatus menunggu persetujuan.
 4. Ikuti instruksi di [supabase/README.md](supabase/README.md) dan jalankan [bootstrap admin pertama](supabase/bootstrap_first_admin.sql) melalui Supabase SQL Editor.
-5. Masuk sebagai admin, buat periode aktif, setujui pendaftar, lalu tetapkan jabatan dan unit.
+5. Ketua Rayon, Sekretaris Umum, Bendahara Umum, Kepala Bidang, atau Admin Sistem dapat menyetujui/menolak pendaftar dari menu **Persetujuan akun**. Penempatan jabatan dan unit tetap diatur Admin Sistem.
 
 ## Keamanan
 
