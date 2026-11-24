@@ -118,7 +118,7 @@ async function loadProfile() {
 function renderAuth() {
   const signup=state.authMode==="signup";
   root.innerHTML='<div class="auth-layout">'+
-    '<section class="auth-hero"><div class="brand-lockup"><div class="brand-mark">P</div><div><strong>SIGAP PMII FEBI</strong><small>Sistem Informasi Evaluasi Kepengurusan</small></div></div>'+
+    '<section class="auth-hero"><div class="brand-lockup"><div class="brand-logo auth-logo"><img src="./assets/logo-pmii-febi.jpg" alt="Logo PMII Rayon Ekonomi Bisnis Islam"></div><div><strong>SIGAP PMII FEBI</strong><small>Sistem Informasi Evaluasi Kepengurusan</small></div></div>'+
     '<div class="hero-copy"><div class="eyebrow">Bergerak · Berproses · Bertumbuh</div><h1>Merawat amanah.<br>Menumbuhkan gerakan.</h1><p>Ruang digital pengurus PMII Fakultas Ekonomi dan Bisnis Islam untuk mengelola struktur, mengukur kinerja, dan menyusun evaluasi bersama.</p></div>'+
     '<div class="hero-foot">PERGERAKAN MAHASISWA ISLAM INDONESIA · PMII FEBI</div></section>'+
     '<section class="auth-panel"><form class="auth-card" id="auth-form"><div class="eyebrow">Ruang internal organisasi</div><h2>'+(signup?"Buat akun pengurus":"Selamat datang kembali")+'</h2><p>'+(signup?"Daftarkan akun. Ketua Rayon, Sekretaris Umum, Bendahara Umum, atau Kepala Bidang akan memeriksa pendaftaran Anda.":"Masuk untuk melanjutkan proses dan amanah kepengurusan.")+'</p>'+
@@ -132,7 +132,7 @@ function renderAuth() {
 function renderPending() {
   const status=state.profile?.account_status || "pending";
   const message=status==="rejected"?"Pendaftaran akun ditolak. Silakan hubungi Ketua Rayon atau pengurus yang memeriksa pendaftaran.":status==="suspended"?"Akses akun sedang dinonaktifkan. Silakan hubungi Admin Sistem.":"Akun Anda sudah terdaftar. Tunggu persetujuan Ketua Rayon, Sekretaris Umum, Bendahara Umum, atau Kepala Bidang. Anda tidak perlu memverifikasi email.";
-  root.innerHTML='<div class="pending-wrap"><section class="pending-card"><div class="brand-mark" style="margin:0 auto 22px">P</div><div class="pending-icon">⌛</div><div class="eyebrow">SIGAP PMII FEBI</div><h2 style="margin:10px 0">Akun dalam proses</h2><p class="muted" style="line-height:1.7">'+esc(message)+'</p><div style="margin-top:24px"><button class="btn btn-ghost" id="refresh-status">Periksa status lagi</button> <button class="btn" id="logout">Keluar</button></div></section></div>';
+  root.innerHTML='<div class="pending-wrap"><section class="pending-card"><div class="brand-logo pending-logo"><img src="./assets/logo-pmii-febi.jpg" alt="Logo PMII Rayon Ekonomi Bisnis Islam"></div><div class="pending-icon">⌛</div><div class="eyebrow">SIGAP PMII FEBI</div><h2 style="margin:10px 0">Akun dalam proses</h2><p class="muted" style="line-height:1.7">'+esc(message)+'</p><div style="margin-top:24px"><button class="btn btn-ghost" id="refresh-status">Periksa status lagi</button> <button class="btn" id="logout">Keluar</button></div></section></div>';
 }
 function navItem(view,icon,label) {
   return '<button class="nav-item '+(state.view===view?"active":"")+'" data-view="'+view+'"><span class="nav-ico">'+icon+'</span>'+label+'</button>';
@@ -141,13 +141,13 @@ function renderShell() {
   const p=periodActive();
   const profile=state.profile || {};
   const firstRole=ownMemberships()[0]?.role || (isAdmin()?"admin":"anggota");
-  root.innerHTML='<div class="app-shell"><aside class="sidebar" id="sidebar"><div class="side-brand"><div class="brand-mark">P</div><div><strong>SIGAP PMII FEBI</strong><small>Ruang kerja kepengurusan</small></div></div>'+
+  root.innerHTML='<div class="app-shell"><aside class="sidebar" id="sidebar"><div class="side-brand"><div class="brand-logo side-logo"><img src="./assets/logo-pmii-febi.jpg" alt="Logo PMII Rayon Ekonomi Bisnis Islam"></div><div><strong>SIGAP PMII FEBI</strong><small>Ruang kerja kepengurusan</small></div></div>'+
     '<div class="nav-label">Menu utama</div><nav class="nav-list">'+
       navItem("overview","⌂","Dashboard")+navItem("structure","⌘","Struktur organisasi")+navItem("evaluations","✓","Penilaian & evaluasi")+navItem("reports","▤","Laporan kegiatan")+
     '</nav>'+(manageableUnits().length?'<div class="nav-label">Data kepengurusan</div><nav class="nav-list">'+navItem("roster","♧","Data anggota & rapor")+'</nav>':'')+(canApproveAccounts()?'<div class="nav-label">Persetujuan</div><nav class="nav-list">'+navItem("approvals","✓","Persetujuan akun")+'</nav>':'')+(isAdmin()?'<div class="nav-label">Administrasi sistem</div><nav class="nav-list">'+navItem("admin","⚙","Panel admin")+'</nav>':'')+
     '<div class="side-bottom"><div class="user-mini"><div class="avatar">'+esc((profile.full_name||"P").slice(0,1).toUpperCase())+'</div><div><strong>'+esc(profile.full_name||"Pengurus")+'</strong><small>'+esc(roleLabels[firstRole]||"Pengurus")+'</small></div></div><button class="nav-item" id="logout" style="width:100%">⇥ Keluar dari akun</button></div></aside>'+
-    '<main class="main-area"><header class="topbar"><div style="display:flex;align-items:center;gap:12px"><button class="mobile-menu" id="mobile-menu" aria-label="Buka menu">☰</button><div><div class="top-title">PMII Fakultas Ekonomi dan Bisnis Islam</div><div class="top-sub">Sistem evaluasi dan pengembangan kepengurusan</div></div></div>'+
-    '<div class="top-actions">'+(state.periods.length?'<select class="period-select" id="period-select" aria-label="Periode kepengurusan">'+state.periods.map(x=>'<option value="'+esc(x.id)+'" '+(x.id===state.periodId?"selected":"")+'>'+esc(x.name)+(x.status==="active"?" · Aktif":"")+'</option>').join("")+'</select>':'')+'<button class="btn btn-ghost" id="refresh-data">↻</button></div></header><section class="page" id="page-content">'+renderView()+'</section></main></div>';
+    '<main class="main-area"><header class="topbar"><div class="topbar-left"><button class="mobile-menu" id="mobile-menu" aria-label="Buka menu">☰</button><div class="breadcrumb"><span>PMII FEBI</span><b>/</b><strong>'+esc(({overview:"Dashboard",structure:"Struktur organisasi",evaluations:"Penilaian & evaluasi",reports:"Laporan kegiatan",roster:"Data anggota & rapor",approvals:"Persetujuan akun",admin:"Administrasi sistem"})[state.view]||"Dashboard")+'</strong></div></div>'+
+    '<div class="top-actions"><label class="global-search"><span>⌕</span><input id="global-search" type="search" placeholder="Cari anggota, bidang, atau rapor…" autocomplete="off"></label>'+(state.periods.length?'<select class="period-select" id="period-select" aria-label="Periode kepengurusan">'+state.periods.map(x=>'<option value="'+esc(x.id)+'" '+(x.id===state.periodId?"selected":"")+'>'+esc(x.name)+(x.status==="active"?" · Aktif":"")+'</option>').join("")+'</select>':'')+'<button class="top-icon-button" id="refresh-data" aria-label="Segarkan data">↻</button><div class="top-avatar" title="'+esc(profile.full_name||"Pengurus")+'">'+esc((profile.full_name||"P").slice(0,1).toUpperCase())+'</div></div></header><section class="page" id="page-content">'+renderView()+'</section></main></div>';
 }
 function pageHeading(title,desc,action="") {
   return '<div class="page-heading"><div><div class="eyebrow">SIGAP / PMII FEBI</div><h1>'+title+'</h1><p>'+desc+'</p></div>'+action+'</div>';
@@ -155,18 +155,123 @@ function pageHeading(title,desc,action="") {
 function stat(label,value,note,icon) {
   return '<article class="stat-card"><div class="stat-top"><span>'+label+'</span><span class="stat-icon">'+icon+'</span></div><div class="stat-value">'+value+'</div><div class="stat-note">'+note+'</div></article>';
 }
+function scoreForEvaluation(e) {
+  const values=state.scores.filter(s=>s.evaluation_id===e.id);
+  let weighted=0,total=0;
+  for(const s of values){
+    const criterion=state.criteria.find(c=>c.id===s.criterion_id);
+    if(criterion){weighted+=Number(s.score)*Number(criterion.weight);total+=Number(criterion.weight);}
+  }
+  return total?(weighted/total*20):null;
+}
+function evaluationPerson(e) {
+  const nominal=e.subject_roster_id?state.roster.find(m=>m.id===e.subject_roster_id):null;
+  const registered=e.subject_membership_id?state.memberships.find(m=>m.id===e.subject_membership_id):null;
+  const evaluator=state.memberships.find(m=>m.id===e.evaluator_membership_id);
+  return {
+    name:nominal?.full_name||(registered?memberName(registered):"Pengurus"),
+    unit:unitFor(nominal?.unit_id||registered?.unit_id)?.name||"—",
+    position:nominal?.position_title||(registered?roleLabels[registered.role]||registered.role:""),
+    evaluator:evaluator?memberName(evaluator):"Pengurus"
+  };
+}
+function dashboardMonthlyChart(evaluations) {
+  const now=new Date();
+  const months=[];
+  for(let i=5;i>=0;i--){
+    const d=new Date(now.getFullYear(),now.getMonth()-i,1);
+    const rows=evaluations.filter(e=>{
+      const at=new Date(e.created_at);
+      return at.getFullYear()===d.getFullYear() && at.getMonth()===d.getMonth();
+    });
+    const scores=rows.map(scoreForEvaluation).filter(v=>v!==null);
+    months.push({
+      label:d.toLocaleDateString("id-ID",{month:"short"}),
+      value:scores.length?scores.reduce((a,b)=>a+b,0)/scores.length:null,
+      count:rows.length
+    });
+  }
+  const has=months.some(m=>m.value!==null);
+  const x=i=>42+i*112;
+  const y=v=>205-(v/100)*160;
+  const pts=months.map((m,i)=>m.value===null?null:[x(i),y(m.value)]);
+  const path=pts.map((p,i)=>p?(i===0||!pts[i-1]?"M":"L")+p[0]+" "+p[1]:"").filter(Boolean).join(" ");
+  const area=has?path+" L "+x(months.length-1)+" 205 L "+x(0)+" 205 Z":"";
+  const guides=[0,25,50,75,100].map(v=>'<g><line x1="34" y1="'+y(v)+'" x2="615" y2="'+y(v)+'" stroke="#e9ecf3" stroke-dasharray="4 5"/><text x="22" y="'+(y(v)+4)+'" text-anchor="end" fill="#8992a8" font-size="10">'+v+'</text></g>').join("");
+  const dots=pts.map((p,i)=>p?'<circle cx="'+p[0]+'" cy="'+p[1]+'" r="5.5" fill="#f2c500" stroke="#fff" stroke-width="2"><title>'+months[i].label+': '+months[i].value.toFixed(1)+'</title></circle>':"").join("");
+  const labels=months.map((m,i)=>'<text x="'+x(i)+'" y="228" text-anchor="middle" fill="#8992a8" font-size="11">'+m.label+'</text>').join("");
+  return '<div class="line-chart-wrap"><svg viewBox="0 0 650 245" role="img" aria-label="Grafik rata-rata nilai enam bulan terakhir">'+guides+(has?'<defs><linearGradient id="sigap-line-fill" x1="0" x2="0" y1="0" y2="1"><stop offset="0%" stop-color="#f2c500" stop-opacity=".22"/><stop offset="100%" stop-color="#f2c500" stop-opacity="0"/></linearGradient></defs><path d="'+area+'" fill="url(#sigap-line-fill)"/><path d="'+path+'" fill="none" stroke="#f0bd00" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>'+dots:'')+labels+'</svg>'+(has?'':'<div class="chart-empty">Belum ada penilaian pada enam bulan terakhir.</div>')+'</div>';
+}
+function dashboardUnitBars(evaluations) {
+  const grouped={};
+  for(const e of evaluations){
+    const person=evaluationPerson(e);
+    const score=scoreForEvaluation(e);
+    const unitNameValue=person.unit;
+    if(score===null||unitNameValue==="—") continue;
+    grouped[unitNameValue]??={total:0,count:0};
+    grouped[unitNameValue].total+=score;grouped[unitNameValue].count++;
+  }
+  const items=Object.entries(grouped).map(([name,v])=>({name,value:v.total/v.count,count:v.count}))
+    .sort((a,b)=>b.value-a.value).slice(0,5);
+  if(!items.length) return '<div class="chart-empty chart-empty-small">Data nilai per unit belum tersedia.</div>';
+  return '<div class="unit-bars">'+items.map(item=>'<div class="unit-bar-row"><div class="unit-bar-label"><span>'+esc(item.name)+'</span><b>'+item.value.toFixed(1)+'</b></div><div class="unit-bar-track"><i style="width:'+Math.max(0,Math.min(100,item.value))+'%"></i></div></div>').join("")+'</div>';
+}
+function dashboardDonut(reports) {
+  const counts=[
+    {label:"Disetujui",value:reports.filter(r=>r.status==="approved").length,color:"#f2c500"},
+    {label:"Terkirim",value:reports.filter(r=>r.status==="submitted").length,color:"#17264f"},
+    {label:"Perlu revisi",value:reports.filter(r=>r.status==="revision_requested").length,color:"#c7ccd6"},
+    {label:"Draft",value:reports.filter(r=>r.status==="draft").length,color:"#8794b0"}
+  ];
+  const total=counts.reduce((a,b)=>a+b.value,0);
+  if(!total) return '<div class="donut-empty"><div class="donut-ring"></div><span>Belum ada laporan</span></div>';
+  let cursor=0;
+  const slices=counts.map(item=>{
+    const begin=cursor;cursor+=item.value/total*100;
+    return item.color+" "+begin+"% "+cursor+"%";
+  });
+  return '<div class="donut-layout"><div class="donut-ring" style="background:conic-gradient('+slices.join(",")+')"><div class="donut-hole"><strong>'+total+'</strong><small>Laporan</small></div></div><div class="donut-legend">'+counts.map(item=>'<div><i style="background:'+item.color+'"></i><span>'+item.label+'</span><b>'+item.value+'</b></div>').join("")+'</div></div>';
+}
 function renderOverview() {
   const p=periodActive();
-  const active=activeMemberships();
-  const unitCount=state.units.filter(u=>u.unit_type==="bureau").length;
-  const reportCount=state.reports.filter(r=>!p || r.period_id===p.id).length;
-  const evalCount=state.evaluations.filter(e=>!p || e.period_id===p.id).length;
+  const registered=activeMemberships();
+  const nominal=state.roster.filter(m=>m.is_active&&(!p||m.period_id===p.id));
+  const reports=state.reports.filter(r=>!p||r.period_id===p.id);
+  const evaluations=state.evaluations.filter(e=>!p||e.period_id===p.id);
+  const values=evaluations.map(scoreForEvaluation).filter(v=>v!==null);
+  const average=values.length?values.reduce((a,b)=>a+b,0)/values.length:null;
+  const peopleCount=registered.length+nominal.length;
+  const activeFields=state.units.filter(u=>u.unit_type==="field").length;
+  const bureaus=state.units.filter(u=>u.unit_type==="bureau").length;
+  const pendingCount=state.profiles.filter(x=>x.account_status==="pending").length;
+  const recent=[...evaluations].sort((a,b)=>new Date(b.created_at)-new Date(a.created_at)).slice(0,5);
   const myRoles=ownMemberships().map(m=>roleLabels[m.role]||m.role);
-  return '<div class="greeting"><div class="eyebrow">Ahlan wa sahlan, '+esc(state.profile?.full_name||"Pengurus")+'</div><h2>Selamat datang di ruang gerak organisasi.</h2><p>Kelola amanah, pantau perkembangan, dan jaga keberlanjutan gerakan bersama.</p></div>'+
-    '<div class="stats-grid">'+stat("Anggota terdata",active.length,"Pada periode terpilih","♧")+stat("Biro organisasi",unitCount,"Di bawah tiga bidang","⌘")+stat("Penilaian tersimpan",evalCount,"Pada periode terpilih","✓")+stat("Laporan kegiatan",reportCount,"Dokumentasi program","▤")+'</div>'+
-    '<div class="content-grid"><section class="panel"><div class="panel-head"><div><h3>Ruang kerja pengurus</h3><p>Akses cepat sesuai tugas organisasi</p></div><span class="badge">'+esc(p?.name||"Belum ada periode")+'</span></div>'+
-    '<div class="quick-grid"><button class="quick-card" data-view="structure"><span class="quick-ico">⌘</span><b>Struktur organisasi</b><span>Lihat bidang, biro, dan penanggung jawab.</span></button><button class="quick-card" data-view="evaluations"><span class="quick-ico">✓</span><b>Penilaian pengurus</b><span>Berikan skor, catatan, dan rekomendasi.</span></button><button class="quick-card" data-view="reports"><span class="quick-ico">▤</span><b>Laporan kegiatan</b><span>Catat progres dan bukti kegiatan.</span></button><button class="quick-card" data-view="'+(isAdmin()?"admin":"structure")+'"><span class="quick-ico">⚙</span><b>'+(isAdmin()?"Administrasi sistem":"Peta kepengurusan")+'</b><span>'+(isAdmin()?"Kelola pendaftar, periode, dan jabatan.":"Kenali susunan kepengurusan rayon.")+'</span></button></div></section>'+
-    '<section class="panel"><div class="panel-head"><div><h3>Identitas kepengurusan</h3><p>Ringkasan akun Anda</p></div></div><div class="stack"><div><div class="tiny muted">NAMA PENGURUS</div><strong>'+esc(state.profile?.full_name||"—")+'</strong></div><div><div class="tiny muted">EMAIL</div><strong class="small">'+esc(state.user?.email||"—")+'</strong></div><div><div class="tiny muted">JABATAN / ROLE</div><strong class="small">'+esc(myRoles.join(", ")||"Belum ditetapkan")+'</strong></div><div><div class="tiny muted">PERIODE TERPILIH</div><strong class="small">'+esc(p?.name||"Belum tersedia")+'</strong></div></div></section></div>';
+  const table=recent.length?recent.map(e=>{
+    const person=evaluationPerson(e);const value=scoreForEvaluation(e);
+    return '<tr><td><div class="table-person"><strong>'+esc(person.name)+'</strong><small>'+esc(person.position)+'</small></div></td><td>'+esc(person.unit)+'</td><td>'+esc(person.evaluator)+'</td><td><strong class="score-pill">'+(value===null?"—":value.toFixed(1))+'</strong></td><td><span class="badge '+(e.status==="reviewed"?"success":e.status==="submitted"?"gold":"grey")+'">'+esc(e.status==="reviewed"?"Ditinjau":e.status==="submitted"?"Terkirim":"Draft")+'</span></td></tr>';
+  }).join(""):'<tr><td colspan="5"><div class="empty compact-empty">Belum ada penilaian pada periode ini.</div></td></tr>';
+  return '<div class="dashboard-welcome"><div><div class="eyebrow">RINGKASAN KEPENGURUSAN</div><h1>Selamat datang, '+esc(state.profile?.full_name||"Pengurus")+'</h1><p>Pantau data, penilaian, dan perjalanan kepengurusan PMII FEBI.</p></div><div class="welcome-period"><span>PERIODE TERPILIH</span><strong>'+esc(p?.name||"Belum tersedia")+'</strong><small>'+(p?.status==="active"?"Periode aktif":"Periode arsip")+'</small></div></div>'+
+    '<div class="dashboard-top"><section class="panel chart-panel"><div class="panel-head"><div><h3>Statistik Penilaian</h3><p>Rata-rata nilai dalam enam bulan terakhir</p></div><span class="chart-period">6 BULAN</span></div>'+dashboardMonthlyChart(evaluations)+'</section>'+
+    '<div class="dashboard-kpis">'+
+      '<article class="metric-card"><div class="metric-icon">♧</div><div class="metric-label">Anggota terdata</div><strong>'+peopleCount+'</strong><small>'+registered.length+' akun · '+nominal.length+' nama manual</small></article>'+
+      '<article class="metric-card"><div class="metric-icon">✓</div><div class="metric-label">Rata-rata nilai</div><strong>'+(average===null?"—":average.toFixed(1))+'</strong><small>'+evaluations.length+' catatan penilaian</small></article>'+
+      '<article class="metric-card"><div class="metric-icon">▤</div><div class="metric-label">Laporan kegiatan</div><strong>'+reports.length+'</strong><small>'+reports.filter(r=>r.status==="approved").length+' disetujui</small></article>'+
+      '<article class="metric-card"><div class="metric-icon">⌘</div><div class="metric-label">Bidang & biro</div><strong>'+activeFields+' / '+bureaus+'</strong><small>Bidang dan biro organisasi</small></article>'+
+    '</div></div>'+
+    '<div class="dashboard-middle"><section class="panel"><div class="panel-head"><div><h3>Nilai per Unit</h3><p>Rata-rata nilai berdasarkan unit anggota</p></div></div>'+dashboardUnitBars(evaluations)+'</section>'+
+    '<section class="panel"><div class="panel-head"><div><h3>Status Laporan</h3><p>Distribusi laporan periode terpilih</p></div></div>'+dashboardDonut(reports)+'</section>'+
+    '<section class="panel shortcut-panel"><div class="panel-head"><div><h3>Akses Cepat</h3><p>Menu sesuai tugas struktural Anda</p></div></div>'+
+    '<button class="shortcut-row" data-view="structure"><span class="shortcut-symbol">⌘</span><span><b>Struktur organisasi</b><small>Lihat susunan rayon, bidang, dan biro</small></span><i>›</i></button>'+
+    '<button class="shortcut-row" data-view="evaluations"><span class="shortcut-symbol">✓</span><span><b>Penilaian & evaluasi</b><small>Isi skor, catatan, dan rekomendasi</small></span><i>›</i></button>'+
+    '<button class="shortcut-row" data-view="reports"><span class="shortcut-symbol">▤</span><span><b>Laporan kegiatan</b><small>Catat progres dan dokumentasi</small></span><i>›</i></button>'+
+    (manageableUnits().length?'<button class="shortcut-row" data-view="roster"><span class="shortcut-symbol">♧</span><span><b>Data anggota & rapor</b><small>Kelola nama anggota tanpa akun</small></span><i>›</i></button>':"")+
+    (canApproveAccounts()?'<button class="shortcut-row" data-view="approvals"><span class="shortcut-symbol">✓</span><span><b>Persetujuan akun</b><small>'+pendingCount+' pendaftar menunggu keputusan</small></span><i>›</i></button>':"")+
+    (isAdmin()?'<button class="shortcut-row" data-view="admin"><span class="shortcut-symbol">⚙</span><span><b>Administrasi sistem</b><small>Kelola periode dan jabatan</small></span><i>›</i></button>':"")+
+    '</section></div>'+
+    '<section class="panel recent-panel"><div class="panel-head"><div><h3>Penilaian Terbaru</h3><p>Riwayat evaluasi pengurus pada '+esc(p?.name||"periode terpilih")+'</p></div><button class="btn btn-ghost" data-view="evaluations">Lihat semua</button></div>'+
+    '<div class="table-wrap"><table class="dashboard-table"><thead><tr><th>Nama anggota</th><th>Unit</th><th>Penilai</th><th>Nilai</th><th>Status</th></tr></thead><tbody>'+table+'</tbody></table></div></section>'+
+    '<div class="dashboard-footnote"><span><i></i> Sistem Informasi Evaluasi dan Penilaian Kepengurusan</span><span>PMII Rayon Ekonomi Bisnis Islam</span></div>';
 }
 function personChips(unit) {
   const periodId=periodActive()?.id;
