@@ -78,7 +78,8 @@ async function restoreSession() {
 function periodActive() { return state.periods.find(p=>p.id===state.periodId) || state.periods.find(p=>p.status==="active") || null; }
 function isAdmin() { return state.memberships.some(m=>m.role==="admin" && m.status==="active"); }
 function canApproveAccounts() {
-  return isAdmin() || ownMemberships().some(m=>["ketua_rayon","sekretaris_umum","bendahara_umum","kepala_bidang"].includes(m.role));
+  const activePeriod=state.periods.find(p=>p.status==="active");
+  return isAdmin() || (!!activePeriod && ownMemberships().some(m=>m.period_id===activePeriod.id && ["ketua_rayon","sekretaris_umum","bendahara_umum","kepala_bidang"].includes(m.role)));
 }
 function ownMemberships() { return state.memberships.filter(m=>m.user_id===state.user?.id && m.status==="active"); }
 function activeMemberships() {
