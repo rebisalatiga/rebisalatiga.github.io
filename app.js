@@ -5,6 +5,7 @@ const root = document.getElementById("app");
 const state = {
   session: null, user: null, profile: null, profiles: [], units: [], periods: [],
   memberships: [], roster: [], criteria: [], evaluations: [], scores: [], reports: [],
+  publicStructure: [], publicMode: false,
   view: "overview", periodId: "", authMode: "login", busy: false, searchQuery: ""
 };
 const $ = (selector, scope=document) => scope.querySelector(selector);
@@ -104,12 +105,28 @@ async function loadData() {
     api("evaluation_criteria?select=*&is_active=eq.true&order=sort_order.asc"),
     api("evaluations?select=*&order=created_at.desc"),
     api("evaluation_scores?select=*&order=created_at.desc"),
-    api("activity_reports?select=*&order=created_at.desc")
+    api("activity_reports?select=*&order=created_at.desc"),
+    api("public_organization_structure?select=*&order=sort_order.asc,person_name.asc")
   ]);
-  [state.profiles,state.units,state.periods,state.memberships,state.roster,state.criteria,state.evaluations,state.scores,state.reports]=results;
+  [state.profiles,state.units,state.periods,state.memberships,state.roster,state.criteria,state.evaluations,state.scores,state.reports,state.publicStructure]=results;
   if(!state.periodId || !state.periods.some(p=>p.id===state.periodId)) {
     state.periodId=state.periods.find(p=>p.status==="active")?.id || state.periods[0]?.id || "";
   }
+}
+async function loadPublicStructure() {
+  const rows=await api("public_organization_structure?select=*&order=sort_order.asc,person_name.asc");
+  state.publicStructure=rows||[];
+  const byId=new Map();
+  for(const row of state.publicStructure) {
+    if(!byId.has(row.unit_id)) byId.set(row.unit_id,{
+      id:row.unit_id,parent_id:row.parent_id,code:row.unit_code,name:row.unit_name,
+      unit_type:row.unit_type,sort_order:row.sort_order,is_active:true
+    });
+  }
+  state.units=[...byId.values()];
+  state.publicMode=true;
+  state.view="structure";
+  render();
 }
 async function loadProfile() {
   const rows=await api("profiles?select=*&id=eq."+encodeURIComponent(state.user.id)+"&limit=1");
@@ -127,7 +144,8 @@ function renderAuth() {
     '<div class="field"><label>Password</label><input name="password" type="password" required minlength="8" autocomplete="'+(signup?"new-password":"current-password")+'" placeholder="Minimal 8 karakter"></div>'+
     '<button class="btn btn-block" type="submit">'+(signup?"Daftar akun":"Masuk ke SIGAP")+'</button>'+
     '<div class="auth-switch">'+(signup?'Sudah memiliki akun? <button type="button" class="link-btn" data-auth-mode="login">Masuk</button>':'Belum memiliki akun? <button type="button" class="link-btn" data-auth-mode="signup">Daftar sekarang</button>')+'</div>'+
-    '<p class="tiny muted" style="margin-top:24px;line-height:1.6">Email tidak perlu diverifikasi. Akun baru menunggu persetujuan Ketua Rayon, Sekretaris Umum, Bendahara Umum, atau Kepala Bidang. Penetapan jabatan tetap dilakukan oleh pengurus berwenang.</p></form></section></div>';
+    '<div class="auth-switch"><button type="button" class="link-btn" id="public-structure">Lihat struktur organisasi publik</button></div>'+
+     '<p class="tiny muted" style="margin-top:24px;line-height:1.6">Email tidak perlu diverifikasi. Akun baru menunggu persetujuan Ketua Rayon, Sekretaris Umum, Bendahara Umum, atau Kepala Bidang. Penetapan jabatan tetap dilakukan oleh pengurus berwenang.</p></form></section></div>';
 }
 function renderPending() {
   const status=state.profile?.account_status || "pending";
@@ -167,11 +185,12 @@ function scoreForEvaluation(e) {
 function evaluationPerson(e) {
   const nominal=e.subject_roster_id?state.roster.find(m=>m.id===e.subject_roster_id):null;
   const registered=e.subject_membership_id?state.memberships.find(m=>m.id===e.subject_membership_id):null;
+  const bureau=e.subject_unit_id?unitFor(e.subject_unit_id):null;
   const evaluator=state.memberships.find(m=>m.id===e.evaluator_membership_id);
   return {
-    name:nominal?.full_name||(registered?memberName(registered):"Pengurus"),
-    unit:unitFor(nominal?.unit_id||registered?.unit_id)?.name||"—",
-    position:nominal?.position_title||(registered?roleLabels[registered.role]||registered.role:""),
+    name:bureau?("Biro "+bureau.name):(nominal?.full_name||(registered?memberName(registered):"Pengurus")),
+    unit:unitFor(bureau?.parent_id||nominal?.unit_id||registered?.unit_id)?.name||"—",
+    position:bureau?"Penilaian Biro":(nominal?.position_title||(registered?roleLabels[registered.role]||registered.role:"")),
     evaluator:evaluator?memberName(evaluator):"Pengurus"
   };
 }
@@ -274,14 +293,12 @@ function renderOverview() {
     '<div class="dashboard-footnote"><span><i></i> Sistem Informasi Evaluasi dan Penilaian Kepengurusan</span><span>PMII Rayon Ekonomi Bisnis Islam</span></div>';
 }
 function personChips(unit) {
-  const periodId=periodActive()?.id;
-  const officers=state.memberships.filter(m=>m.unit_id===unit.id && m.status==="active" && (m.role==="admin" || !periodId || m.period_id===periodId));
-  const roster=state.roster.filter(m=>m.unit_id===unit.id && m.is_active && (!periodId || m.period_id===periodId));
-  const chips=[
-    ...officers.map(m=>'<span class="person-chip">'+esc(memberName(m))+' · '+esc(roleLabels[m.role]||m.role)+'</span>'),
-    ...roster.map(m=>'<span class="person-chip">'+esc(m.full_name)+' · '+esc(m.position_title||"Anggota")+'</span>')
-  ];
-  return '<div class="unit-people">'+(chips.length?chips.join(""):'<span class="person-chip">Belum ada anggota tercatat</span>')+'</div>';
+  const people=state.publicStructure.filter(person=>person.unit_id===unit.id && person.person_name);
+  const chips=people.map(person=>{
+    const position=person.person_position || roleLabels[person.person_role] || "Anggota";
+    return '<span class="person-chip">'+esc(person.person_name)+' · '+esc(position)+'</span>';
+  });
+  return '<div class="unit-people">'+(chips.length?chips.join(""):'<span class="person-chip">Belum ada nama tercatat</span>')+'</div>';
 }
 function renderStructure() {
   const rootUnit=state.units.find(u=>u.code==="pmii-febi");
@@ -289,7 +306,7 @@ function renderStructure() {
   const children=parent=>state.units.filter(u=>u.parent_id===parent).sort((a,b)=>a.sort_order-b.sort_order);
   const renderUnit=(unit,level)=>'<article class="unit-card" style="margin-left:'+Math.min(level*17,50)+'px"><div class="unit-row"><div class="unit-title"><div class="unit-symbol">'+(unit.unit_type==="bureau"?"◈":unit.unit_type==="field"?"⌘":unit.unit_type==="executive"?"▤":"✦")+'</div><div><strong>'+esc(unit.name)+'</strong><small>'+({rayon:"Struktur rayon",executive:"Unsur eksekutif",field:"Kepala bidang",bureau:"Biro"}[unit.unit_type]||"Unit")+'</small></div></div><span class="badge '+(unit.unit_type==="field"?"gold":"")+'">'+({rayon:"Rayon",executive:"Eksekutif",field:"Bidang",bureau:"Biro"}[unit.unit_type])+'</span></div>'+personChips(unit)+'</article>'+children(unit.id).map(child=>renderUnit(child,level+1)).join("");
   return pageHeading("Struktur organisasi","Peta kepengurusan PMII FEBI dari Ketua Rayon hingga koordinator dan anggota.")+
-    '<div class="notice">Setiap bidang memiliki Kepala Bidang dan Sekretaris Bidang yang sejajar, dengan biro-biro di bawahnya. Nama anggota nominal juga ditampilkan di struktur meskipun belum memiliki akun SIGAP.</div><div class="unit-list">'+renderUnit(rootUnit,0)+'</div>';
+    '<div class="notice">Direktori ini menampilkan nama pengurus dan anggota pada periode aktif. Kepala Bidang memiliki kewenangan lebih tinggi daripada Sekretaris Bidang. Data penilaian dan evaluasi tetap dibatasi menurut lingkup jabatan masing-masing.</div><div class="unit-list">'+renderUnit(rootUnit,0)+'</div>';
 }
 function descendantsOf(unitId) {
   const found=new Set([unitId]); let changed=true;
@@ -304,7 +321,8 @@ function canManageUnit(unitId) {
   return ownMemberships().some(m=>m.period_id===periodId && (
     m.role==="ketua_rayon" ||
     (["sekretaris_umum","bendahara_umum"].includes(m.role) && m.unit_id===unitId) ||
-    (["kepala_bidang","sekretaris_bidang"].includes(m.role) && descendantsOf(m.unit_id).has(unitId)) ||
+    (m.role==="kepala_bidang" && descendantsOf(m.unit_id).has(unitId)) ||
+    (m.role==="sekretaris_bidang" && unitFor(unitId)?.unit_type==="bureau" && descendantsOf(m.unit_id).has(unitId)) ||
     (m.role==="koordinator_biro" && m.unit_id===unitId)
   ));
 }
@@ -333,21 +351,27 @@ function evaluationTargets() {
       ref:"roster:"+m.id,target_type:"roster",target_id:m.id,
       full_name:m.full_name,unit_id:m.unit_id,position_title:m.position_title||"Anggota"
     }));
-  return [...nominal,...registered].sort((a,b)=>a.full_name.localeCompare(b.full_name,"id"));
+  const bureaus=manageableUnits().filter(unit=>unit.unit_type==="bureau").map(unit=>({
+    ref:"unit:"+unit.id,target_type:"unit",target_id:unit.id,
+    full_name:unit.name,unit_id:unit.id,position_title:"Penilaian kinerja biro"
+  }));
+  return [...nominal,...registered,...bureaus].sort((a,b)=>a.full_name.localeCompare(b.full_name,"id"));
 }
 function renderEvaluationCard(e) {
   const rosterTarget=e.subject_roster_id?state.roster.find(m=>m.id===e.subject_roster_id):null;
   const target=e.subject_membership_id?state.memberships.find(m=>m.id===e.subject_membership_id):null;
+  const bureauTarget=e.subject_unit_id?unitFor(e.subject_unit_id):null;
   const evaluator=state.memberships.find(m=>m.id===e.evaluator_membership_id);
   const values=state.scores.filter(s=>s.evaluation_id===e.id);
   let weighted=0,weightTotal=0;
   for(const s of values){const c=state.criteria.find(x=>x.id===s.criterion_id);if(c){weighted+=Number(s.score)*Number(c.weight);weightTotal+=Number(c.weight);}}
   const score=weightTotal?(weighted/weightTotal*20).toFixed(1):"—";
-  const displayName=rosterTarget?.full_name||(target?memberName(target):"Pengurus");
-  const displayUnit=unitFor(rosterTarget?.unit_id||target?.unit_id)?.name||"";
-  const displayPosition=rosterTarget?.position_title||(target?roleLabels[target.role]||target.role:"");
+  const displayName=bureauTarget?("Biro "+bureauTarget.name):(rosterTarget?.full_name||(target?memberName(target):"Pengurus"));
+  const displayUnit=unitFor(bureauTarget?.parent_id||rosterTarget?.unit_id||target?.unit_id)?.name||"";
+  const displayPosition=bureauTarget?"Penilaian kinerja biro":(rosterTarget?.position_title||(target?roleLabels[target.role]||target.role:""));
   const reviewAction=isAdmin()&&e.status==="submitted" ? '<div style="margin-top:12px"><button class="btn btn-ghost" data-review-evaluation="'+e.id+'">Tandai sudah ditinjau</button></div>' : "";
-  return '<article class="eval-card"><div class="eval-meta"><div><h4>'+esc(displayName)+'</h4><div class="tiny muted">'+esc(displayUnit)+' · '+esc(displayPosition)+' · Dinilai oleh '+esc(evaluator?memberName(evaluator):"Pengurus")+'</div></div><span class="badge '+(e.status==="submitted"?"gold":e.status==="reviewed"?"":"grey")+'">'+esc(e.status==="submitted"?"Terkirim":e.status==="reviewed"?"Ditinjau":"Draft")+'</span></div><p>'+esc(e.strengths||"Belum ada catatan kekuatan.")+'</p><div class="small"><strong>Nilai akhir: '+score+(score==="—"?"":" / 100")+'</strong> <span class="muted">· '+dateText(e.created_at)+'</span></div><div class="tiny muted" style="margin-top:7px">Perbaikan: '+esc(e.improvements||"—")+' · Kendala: '+esc(e.obstacles||"—")+' · Rekomendasi: '+esc(e.recommendations||"—")+'</div>'+reviewAction+'</article>';
+  const bureauReportAction=bureauTarget?'<div style="margin-top:12px"><button class="btn btn-ghost" data-print-bureau="'+bureauTarget.id+'">Cetak rapor biro</button></div>':"";
+  return '<article class="eval-card"><div class="eval-meta"><div><h4>'+esc(displayName)+'</h4><div class="tiny muted">'+esc(displayUnit)+' · '+esc(displayPosition)+' · Dinilai oleh '+esc(evaluator?memberName(evaluator):"Pengurus")+'</div></div><span class="badge '+(e.status==="submitted"?"gold":e.status==="reviewed"?"":"grey")+'">'+esc(e.status==="submitted"?"Terkirim":e.status==="reviewed"?"Ditinjau":"Draft")+'</span></div><p>'+esc(e.strengths||"Belum ada catatan kekuatan.")+'</p><div class="small"><strong>Nilai akhir: '+score+(score==="—"?"":" / 100")+'</strong> <span class="muted">· '+dateText(e.created_at)+'</span></div><div class="tiny muted" style="margin-top:7px">Perbaikan: '+esc(e.improvements||"—")+' · Kendala: '+esc(e.obstacles||"—")+' · Rekomendasi: '+esc(e.recommendations||"—")+'</div>'+reviewAction+bureauReportAction+'</article>';
 }
 function renderEvaluations() {
   const p=periodActive();
@@ -362,8 +386,8 @@ function renderEvaluations() {
     const person=evaluationPerson(e);
     return [person.name,person.unit,person.position,person.evaluator].some(v=>String(v||"").toLocaleLowerCase("id").includes(query));
   });
-  const form= evaluator && targets.length ? '<section class="panel"><div class="panel-head"><div><h3>Buat penilaian baru</h3><p>Nama anggota dapat dinilai meskipun belum mempunyai akun SIGAP.</p></div><span class="badge gold">'+esc(p.name)+'</span></div><form id="evaluation-form"><div class="field"><label>Anggota yang dinilai</label><select name="subject_ref" required><option value="">Pilih nama anggota</option>'+targets.map(m=>'<option value="'+m.ref+'">'+esc(m.full_name)+' · '+esc(unitFor(m.unit_id)?.name||"Unit")+' · '+esc(m.position_title)+'</option>').join("")+'</select></div>'+
-    '<div class="notice">Skala nilai: 1 Sangat Kurang · 2 Kurang · 3 Cukup · 4 Baik · 5 Sangat Baik. Bobot indikator berjumlah 100%.</div>'+
+  const form= evaluator && targets.length ? '<section class="panel"><div class="panel-head"><div><h3>Buat penilaian baru</h3><p>Nama anggota dapat dinilai meskipun belum mempunyai akun SIGAP.</p></div><span class="badge gold">'+esc(p.name)+'</span></div><form id="evaluation-form"'<div class="field"><label>Pengurus, anggota, atau biro yang dinilai</label><select name="subject_ref" required><option value="">Pilih nama atau biro</option>'+targets.map(m=>'<option value="'+m.ref+'">'+(m.target_type==="unit"?"Biro · ":"")+esc(m.full_name)+' · '+esc(unitFor(m.unit_id)?.name||"Unit")+' · '+esc(m.position_title)+'</option>').join("")+'</select></div>'+
+    '<div class="notice">Penilaian dapat dibuat untuk pengurus berakun, anggota nominal tanpa akun, atau kinerja biro secara keseluruhan. Skala nilai 1–5; bobot indikator berjumlah 100%.</div>'+
     criteria.map(c=>'<div class="criterion-row"><div><strong>'+esc(c.name)+' <span class="muted">('+Number(c.weight)+'%)</span></strong><small>'+esc(c.description||"")+'</small></div><select name="score_'+c.id+'" required><option value="3">3 · Cukup</option><option value="1">1 · Sangat kurang</option><option value="2">2 · Kurang</option><option value="4">4 · Baik</option><option value="5">5 · Sangat baik</option></select></div>').join("")+
     '<div class="field"><label>Hal yang sudah berjalan baik</label><textarea name="strengths" placeholder="Tuliskan capaian atau praktik baik…"></textarea></div><div class="field"><label>Hal yang perlu ditingkatkan</label><textarea name="improvements" placeholder="Tuliskan kekurangan yang perlu diperbaiki…"></textarea></div><div class="field"><label>Kendala yang dihadapi</label><textarea name="obstacles" placeholder="Tuliskan kendala yang ditemukan…"></textarea></div><div class="field"><label>Rekomendasi dan target berikutnya</label><textarea name="recommendations" placeholder="Tuliskan langkah perbaikan…"></textarea></div><div class="form-actions"><button class="btn" type="submit">Kirim penilaian</button></div></form></section>' :
     '<div class="notice warn">Belum ada penugasan aktif yang dapat digunakan untuk menilai pada periode ini. Anggota dapat melihat penilaian diri setelah memiliki penugasan.</div>';
@@ -436,7 +460,7 @@ function renderRoster() {
     .sort((a,b)=>a.full_name.localeCompare(b.full_name,"id"));
   const unitOptions=units.map(u=>'<option value="'+u.id+'">'+esc(u.name)+'</option>').join("");
   return pageHeading("Data anggota & rapor","Masukkan nama orang yang berada di bawah unit Anda. Mereka tidak perlu membuat akun SIGAP untuk dicatat dan dinilai.")+
-    '<div class="notice">Daftar ini adalah data keanggotaan/rapor organisasi, bukan akun login. Ketua Rayon dapat mengelola seluruh unit; Kepala Bidang dan Sekretaris Bidang mengelola bidang beserta biro di bawahnya; Koordinator Biro mengelola unit bironya.</div>'+
+    '<div class="notice">Daftar ini adalah data keanggotaan/rapor organisasi, bukan akun login. Ketua Rayon mengelola seluruh unit; Kepala Bidang mengelola bidang dan semua biro serta dapat melihat penilaian Sekretaris Bidang; Sekretaris Bidang mengelola biro di bawahnya; Koordinator Biro hanya mengelola bironya.</div>'+
     '<div class="split"><section class="panel"><div class="panel-head"><div><h3>Tambah anggota</h3><p>Data akan masuk ke struktur dan dapat dipilih pada formulir penilaian.</p></div></div>'+
     '<form id="roster-form"><div class="field"><label>Nama lengkap</label><input name="full_name" required maxlength="120" placeholder="Nama anggota"></div><div class="field"><label>Unit / biro</label><select name="unit_id" required><option value="">Pilih unit</option>'+unitOptions+'</select></div><div class="field"><label>Jabatan dalam unit</label><input name="position_title" maxlength="100" placeholder="Contoh: Anggota / Staf Kaderisasi" value="Anggota"></div><div class="form-grid"><div class="field"><label>NIM (opsional)</label><input name="nim" maxlength="40" placeholder="Nomor induk mahasiswa"></div><div class="field"><label>Angkatan (opsional)</label><input name="cohort" maxlength="20" placeholder="Contoh: 2024"></div></div><div class="form-actions"><button class="btn" type="submit">Simpan nama anggota</button></div></form></section>'+
     '<section class="panel"><div class="panel-head"><div><h3>Daftar anggota nominal</h3><p>'+people.filter(x=>x.is_active).length+' aktif · '+people.filter(x=>!x.is_active).length+' diarsipkan · '+esc(p.name)+'</p></div></div>'+
@@ -504,6 +528,25 @@ function printRosterReport(id) {
   popup.document.write('<!doctype html><html lang="id"><head><meta charset="utf-8"><title>Rapor - '+esc(person.full_name)+'</title><style>body{font:14px Arial,sans-serif;color:#17251e;margin:32px;line-height:1.5}h1{font-size:24px;margin-bottom:4px}h2{font-size:17px;border-bottom:1px solid #bbb;padding-bottom:6px}h3{font-size:13px;margin:12px 0 2px}p{margin:2px 0 8px}.meta{margin:18px 0;padding:14px;border:1px solid #ccc;border-radius:8px}.score{font-size:18px}table{width:100%;border-collapse:collapse;margin:10px 0}th,td{text-align:left;border:1px solid #ccc;padding:7px}.entry{page-break-inside:avoid;border-top:2px solid #234c37;margin-top:22px;padding-top:4px}.muted{color:#66736b}@media print{body{margin:16mm}.entry{break-inside:avoid}}</style></head><body><h1>RAPOR ANGGOTA PMII FEBI</h1><p class="muted">Sistem Informasi Evaluasi dan Penilaian Kepengurusan</p><div class="meta"><p><b>Nama:</b> '+esc(person.full_name)+'</p><p><b>NIM:</b> '+esc(person.nim||"—")+'</p><p><b>Angkatan:</b> '+esc(person.cohort||"—")+'</p><p><b>Jabatan:</b> '+esc(person.position_title||"Anggota")+'</p><p><b>Unit:</b> '+esc(unit?.name||"—")+'</p><p><b>Periode:</b> '+esc(period?.name||"—")+'</p></div>'+evalHtml+'<p class="muted" style="margin-top:36px">Dokumen dihasilkan dari SIGAP PMII FEBI.</p><script>window.onload=()=>window.print();<\/script></body></html>');
   popup.document.close();
 }
+function printBureauReport(unitId) {
+  const unit=unitFor(unitId), p=periodActive();
+  if(!unit || !p || !canManageUnit(unitId)) return;
+  const evaluations=state.evaluations.filter(e=>e.subject_unit_id===unitId && e.period_id===p.id)
+    .sort((a,b)=>new Date(b.created_at)-new Date(a.created_at));
+  const parent=unitFor(unit.parent_id);
+  const entries=evaluations.map((e,index)=>{
+    const rows=state.scores.filter(score=>score.evaluation_id===e.id).map(score=>{
+      const criterion=state.criteria.find(c=>c.id===score.criterion_id);
+      return criterion?'<tr><td>'+esc(criterion.name)+'</td><td>'+Number(criterion.weight)+'%</td><td>'+Number(score.score)+'/5</td></tr>':"";
+    }).join("");
+    const final=scoreForEvaluation(e);
+    return '<section class="entry"><h2>Penilaian '+(index+1)+' · '+dateText(e.created_at)+'</h2><p class="score">Nilai akhir: <strong>'+(final===null?"—":final.toFixed(1)+" / 100")+'</strong></p><table><thead><tr><th>Indikator</th><th>Bobot</th><th>Skor</th></tr></thead><tbody>'+rows+'</tbody></table><h3>Kekuatan</h3><p>'+esc(e.strengths||"—")+'</p><h3>Hal yang perlu ditingkatkan</h3><p>'+esc(e.improvements||"—")+'</p><h3>Kendala</h3><p>'+esc(e.obstacles||"—")+'</p><h3>Rekomendasi</h3><p>'+esc(e.recommendations||"—")+'</p></section>';
+  }).join("") || "<p>Belum ada penilaian untuk biro ini.</p>";
+  const popup=window.open("","_blank");
+  if(!popup){toast("Izinkan pop-up browser untuk mencetak rapor biro.",true);return;}
+  popup.document.write('<!doctype html><html lang="id"><head><meta charset="utf-8"><title>Rapor Biro '+esc(unit.name)+'</title><style>body{font:14px Arial,sans-serif;color:#17251e;margin:32px;line-height:1.5}h1{font-size:24px;margin-bottom:4px}h2{font-size:17px;border-bottom:1px solid #bbb;padding-bottom:6px}h3{font-size:13px;margin:12px 0 2px}p{margin:2px 0 8px}.meta{margin:18px 0;padding:14px;border:1px solid #ccc;border-radius:8px}.score{font-size:18px}table{width:100%;border-collapse:collapse;margin:10px 0}th,td{text-align:left;border:1px solid #ccc;padding:7px}.entry{page-break-inside:avoid;border-top:2px solid #234c37;margin-top:22px;padding-top:4px}.muted{color:#66736b}@media print{body{margin:16mm}.entry{break-inside:avoid}}</style></head><body><h1>RAPOR KINERJA BIRO</h1><p class="muted">SIGAP PMII FEBI · '+esc(p.name)+'</p><div class="meta"><p><b>Nama biro:</b> '+esc(unit.name)+'</p><p><b>Bidang:</b> '+esc(parent?.name||"—")+'</p><p><b>Periode:</b> '+esc(p.name)+'</p></div>'+entries+'<p class="muted" style="margin-top:36px">Dokumen dihasilkan dari SIGAP PMII FEBI.</p><script>window.onload=()=>window.print();<\\/script></body></html>');
+  popup.document.close();
+}
 function renderAdmin() {
   const pending=state.profiles.filter(p=>p.account_status==="pending");
   const approved=state.profiles.filter(p=>p.account_status==="active");
@@ -537,8 +580,11 @@ function renderView() {
   if(state.view==="admin" && isAdmin()) return renderAdmin();
   return renderOverview();
 }
+function renderPublicStructure() {
+  root.innerHTML='<div class="public-structure-shell"><header class="public-structure-top"><div class="public-structure-brand"><div class="brand-logo auth-logo"><img src="https://1.bp.blogspot.com/-_LPIjxug5bs/W1YpWUAw0FI/AAAAAAAAAac/26D9u4GoFe0qM9sdOUpfSyV0MH4RO1y0QCLcBGAs/s1600/logo_pmii_hd.png" alt="Lambang PMII"></div><div><strong>SIGAP PMII FEBI</strong><small>Direktori struktur kepengurusan</small></div></div><button class="btn btn-ghost" id="back-to-login">Masuk / Daftar</button></header><main class="public-structure-main">'+renderStructure()+'<p class="tiny muted">Direktori publik hanya memuat nama, jabatan, dan unit. Data penilaian dan evaluasi hanya tersedia bagi pengurus berwenang setelah masuk.</p></main></div>';
+}
 function render() {
-  if(!state.user) return renderAuth();
+  if(!state.user) return state.publicMode?renderPublicStructure():renderAuth();
   if(!state.profile || state.profile.account_status!=="active") return renderPending();
   renderShell();
 }
@@ -549,7 +595,7 @@ async function reload() {
 }
 async function signOut() {
   try { if(state.session?.access_token) await authRequest("/logout",{method:"POST"},state.session.access_token); } catch(_){}
-  saveSession(null); state.user=null; state.profile=null; renderAuth();
+  saveSession(null); state.user=null; state.profile=null; state.publicMode=false; renderAuth();
 }
 async function handleAuth(form) {
   const values=Object.fromEntries(new FormData(form).entries());
@@ -580,12 +626,13 @@ async function submitEvaluation(form) {
   const p=periodActive(); const evaluator=ownEvaluatorMembership();
   if(!p || !evaluator) throw new Error("Periode atau penugasan evaluator belum tersedia.");
   const [subjectType,subjectId]=String(values.subject_ref||"").split(":");
-  if(!subjectId || !["roster","membership"].includes(subjectType)) throw new Error("Pilih anggota yang akan dinilai.");
+  if(!subjectId || !["roster","membership","unit"].includes(subjectType)) throw new Error("Pilih pengurus, anggota, atau biro yang akan dinilai.");
   const criteria=state.criteria.filter(c=>c.period_id===null || c.period_id===p.id);
   const created=await api("evaluations",{method:"POST",body:JSON.stringify({
     period_id:p.id,evaluator_membership_id:evaluator.id,
     subject_membership_id:subjectType==="membership"?subjectId:null,
     subject_roster_id:subjectType==="roster"?subjectId:null,
+    subject_unit_id:subjectType==="unit"?subjectId:null,
     status:"draft",strengths:values.strengths||null,improvements:values.improvements||null,
     obstacles:values.obstacles||null,recommendations:values.recommendations||null
   })});
@@ -644,6 +691,12 @@ async function assignRole(form) {
   await loadData(); state.view="admin"; render();
 }
 document.addEventListener("click",async event=>{
+  if(event.target.closest("#public-structure")){
+    const trigger=event.target.closest("#public-structure");trigger.disabled=true;
+    try{await loadPublicStructure();}catch(e){toast(e.message,true);trigger.disabled=false;}
+    return;
+  }
+  if(event.target.closest("#back-to-login")){state.publicMode=false;renderAuth();return;}
   const view=event.target.closest("[data-view]");
   if(view){state.view=view.dataset.view;renderShell();return;}
   const mode=event.target.closest("[data-auth-mode]");
@@ -671,6 +724,8 @@ document.addEventListener("click",async event=>{
   if(editRoster){openRosterEditor(editRoster.dataset.editRoster);return;}
   const printRoster=event.target.closest("[data-print-roster]");
   if(printRoster){printRosterReport(printRoster.dataset.printRoster);return;}
+  const printBureau=event.target.closest("[data-print-bureau]");
+  if(printBureau){printBureauReport(printBureau.dataset.printBureau);return;}
   const toggleRoster=event.target.closest("[data-toggle-roster]");
   if(toggleRoster){
     const person=state.roster.find(m=>m.id===toggleRoster.dataset.toggleRoster);
