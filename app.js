@@ -818,6 +818,11 @@ document.addEventListener("submit",async event=>{
 });
 async function init() {
   if(!API || !KEY){renderAuth();toast("Konfigurasi Supabase belum lengkap.",true);return;}
+  if(new URLSearchParams(window.location.search).has("struktur")){
+    try{await loadPublicStructure();}
+    catch(error){renderAuth();toast("Direktori struktur belum dapat dimuat: "+error.message,true);}
+    return;
+  }
   const restored=await restoreSession();
   if(restored){try{await reload();}catch(error){toast(error.message,true);render();}}
   else renderAuth();
