@@ -43,7 +43,8 @@ security definer
 set search_path = ''
 as $function$
 begin
-  delete from public.org_structure_directory;
+  delete from public.org_structure_directory
+  where source_type in ('membership','roster');
 
   insert into public.org_structure_directory
     (source_type,source_id,period_id,unit_id,person_name,person_role,person_position,is_active)
