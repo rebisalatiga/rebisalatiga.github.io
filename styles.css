@@ -313,3 +313,27 @@ tr:hover td{background:#fafbfe}
 }
 .boot-logo{width:190px;height:94px;background:#fff;border-radius:12px;padding:5px 8px;box-shadow:0 6px 22px rgba(17,26,61,.1);display:grid;place-items:center}
 .boot-logo img{width:100%;height:100%;object-fit:contain}
+
+/* SIGAP brand assets and public organization directory */
+.brand-logo{background:#fff}
+.brand-logo img{object-fit:contain;image-rendering:auto}
+.side-logo{width:58px;height:58px;padding:3px;border-radius:12px}
+.auth-logo{width:76px;height:76px;padding:4px;border-radius:14px}
+.pending-logo{width:104px;height:104px;padding:5px;border-radius:16px}
+.boot-logo{width:88px;height:88px;padding:4px;border-radius:14px}
+.public-structure-shell{min-height:100vh;background:#f3f5fa;color:#192646}
+.public-structure-top{min-height:88px;padding:14px clamp(18px,4vw,56px);display:flex;align-items:center;justify-content:space-between;gap:18px;background:#fff;border-bottom:1px solid #e5e9f1}
+.public-structure-brand{display:flex;align-items:center;gap:14px}
+.public-structure-brand strong{display:block;font-size:15px;color:#15213f;letter-spacing:.04em}
+.public-structure-brand small{display:block;font-size:11px;color:#77839a;margin-top:3px}
+.public-structure-main{max-width:1120px;margin:0 auto;padding:30px clamp(16px,4vw,42px) 56px}
+.public-structure-main .page-heading{margin-bottom:22px}
+.public-structure-main .page-heading h1{font-size:clamp(26px,4vw,36px)}
+.public-structure-main .unit-list{display:grid;gap:12px}
+.public-structure-main .unit-card{background:#fff;border:1px solid #e4e9f2;border-radius:14px;box-shadow:0 4px 18px rgba(20,34,69,.035)}
+@media(max-width:640px){
+  .public-structure-top{min-height:74px;padding:10px 14px}
+  .public-structure-brand{gap:9px}
+  .public-structure-brand .brand-logo{width:54px;height:54px}
+  .public-structure-main{padding-top:22px}
+}
