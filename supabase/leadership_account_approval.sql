@@ -35,9 +35,11 @@ as $function$
       select 1
       from public.memberships m
       join public.profiles p on p.id = m.user_id
+      join public.evaluation_periods ep on ep.id = m.period_id
       where m.user_id = (select auth.uid())
         and m.status = 'active'::public.membership_status
         and p.account_status = 'active'::public.account_status
+        and ep.status = 'active'::public.period_status
         and m.role in (
           'ketua_rayon'::public.app_role,
           'sekretaris_umum'::public.app_role,
