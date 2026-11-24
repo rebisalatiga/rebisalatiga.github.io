@@ -19,7 +19,7 @@ SIGAP membantu pengurus mengelola struktur rayon, bidang, biro, keanggotaan, per
 - Data anggota nominal dapat dicatat oleh pimpinan unit tanpa anggota harus mendaftar atau memiliki akun SIGAP.
 - Penilaian dan evaluasi dapat ditulis untuk anggota nominal, lengkap dengan cetak rapor per orang.
 - Penilaian kinerja biro sebagai satu unit, termasuk cetak rapor biro.
-- Direktori struktur organisasi publik yang menampilkan nama dan jabatan tanpa membuka penilaian, evaluasi, email, atau NIM.
+- Direktori struktur organisasi publik yang menampilkan nama dan jabatan tanpa membuka penilaian, evaluasi, email, atau NIM. Akses langsung: [Direktori struktur publik](https://rebisalatiga.github.io/?struktur).
 - Batas akses penilaian: Ketua Rayon seluruh unit; Kepala Bidang bidang dan semua biro di bawahnya (termasuk melihat penilaian Sekretaris Bidang); Sekretaris Bidang biro di bawahnya; Koordinator Biro hanya biro sendiri.
 - Periode kepengurusan.
 - Penilaian dengan enam indikator berbobot dan skala 1–5.
