@@ -192,9 +192,11 @@ function descendantsOf(unitId) {
   return found;
 }
 function canManageUnit(unitId) {
+  const selectedPeriod=periodActive();
+  if(!selectedPeriod || selectedPeriod.status!=="active") return false;
   if(isAdmin()) return true;
-  const periodId=periodActive()?.id;
-  return !!periodId && ownMemberships().some(m=>m.period_id===periodId && (
+  const periodId=selectedPeriod.id;
+  return ownMemberships().some(m=>m.period_id===periodId && (
     m.role==="ketua_rayon" ||
     (["sekretaris_umum","bendahara_umum"].includes(m.role) && m.unit_id===unitId) ||
     (["kepala_bidang","sekretaris_bidang"].includes(m.role) && descendantsOf(m.unit_id).has(unitId)) ||
@@ -313,6 +315,8 @@ function renderRoster() {
   const p=periodActive();
   if(!p) return pageHeading("Data anggota & rapor","Catat nama pengurus/anggota dan susun rapor penilaian.")+
     '<div class="empty"><strong>Belum ada periode aktif</strong>Admin Sistem perlu mengaktifkan periode sebelum data anggota dibuat.</div>';
+  if(p.status!=="active") return pageHeading("Data anggota & rapor","Data nominal hanya dapat dikelola pada periode yang sedang aktif.")+
+    '<div class="empty"><strong>Periode ini sudah diarsipkan</strong>Pilih periode aktif pada bagian atas untuk menambah atau memperbarui data anggota.</div>';
   const units=manageableUnits();
   const allowed=new Set(units.map(u=>u.id));
   const people=state.roster.filter(m=>m.period_id===p.id && allowed.has(m.unit_id))
