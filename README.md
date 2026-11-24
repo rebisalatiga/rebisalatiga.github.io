@@ -18,6 +18,9 @@ SIGAP membantu pengurus mengelola struktur rayon, bidang, biro, keanggotaan, per
 - Pengelolaan role dan unit organisasi sesuai struktur PMII FEBI, termasuk Sekretaris Bidang sejajar dengan Kepala Bidang.
 - Data anggota nominal dapat dicatat oleh pimpinan unit tanpa anggota harus mendaftar atau memiliki akun SIGAP.
 - Penilaian dan evaluasi dapat ditulis untuk anggota nominal, lengkap dengan cetak rapor per orang.
+- Penilaian kinerja biro sebagai satu unit, termasuk cetak rapor biro.
+- Direktori struktur organisasi publik yang menampilkan nama dan jabatan tanpa membuka penilaian, evaluasi, email, atau NIM.
+- Batas akses penilaian: Ketua Rayon seluruh unit; Kepala Bidang bidang dan semua biro di bawahnya (termasuk melihat penilaian Sekretaris Bidang); Sekretaris Bidang biro di bawahnya; Koordinator Biro hanya biro sendiri.
 - Periode kepengurusan.
 - Penilaian dengan enam indikator berbobot dan skala 1–5.
 - Evaluasi tertulis, rekomendasi perbaikan, dan tinjau admin.
@@ -53,4 +56,4 @@ Pengaturan GitHub Pages:
 
 Publishable key boleh berada di frontend. **Jangan pernah** meletakkan Supabase service-role key atau secret key di repository frontend. Seluruh tabel aplikasi dilindungi RLS; pemberian role dilakukan melalui database oleh admin.
 
-Lihat dokumentasi Supabase untuk [Row Level Security](https://supabase.com/docs/guides/database/postgres/row-level-security).
+Lihat dokumentasi Supabase untuk [Row Level Security](https://supabase.com/docs/guides/database/postgres/row-level-security). Skema terbaru untuk struktur publik, penilaian biro, dan pembatasan lingkup jabatan didokumentasikan di [supabase/03_public_structure_bureau_scoring_hierarchy.sql](supabase/03_public_structure_bureau_scoring_hierarchy.sql).
