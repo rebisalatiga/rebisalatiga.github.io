@@ -337,3 +337,79 @@ tr:hover td{background:#fafbfe}
   .public-structure-brand .brand-logo{width:54px;height:54px}
   .public-structure-main{padding-top:22px}
 }
+
+/* PMII FEBI — connected public organization chart */
+.org-document{background:#fff;border:1px solid #e5e9f2;border-radius:18px;overflow:hidden}
+.org-document-heading{text-align:center;padding:30px 22px 20px;background:linear-gradient(180deg,#f8f9fc,#fff);border-bottom:1px solid #e7ebf3}
+.org-document-kicker{font-size:11px;font-weight:900;letter-spacing:.22em;color:#b48a00;margin-bottom:9px}
+.org-document-heading h2{font-size:clamp(15px,2vw,22px);font-weight:900;letter-spacing:.055em;color:#17264c;margin:0}
+.org-document-heading h3{font-size:clamp(13px,1.7vw,18px);font-weight:800;letter-spacing:.045em;color:#26365c;margin:7px 0}
+.org-document-heading p{font-size:13px;font-weight:800;letter-spacing:.16em;color:#8a6a00;margin:10px 0 0}
+.org-document-meta{display:flex;justify-content:center;gap:8px;flex-wrap:wrap;margin-top:16px}
+.org-document-meta span{font-size:10px;font-weight:700;color:#53617b;background:#eef1f7;border-radius:999px;padding:6px 11px}
+.org-directory-actions{display:flex;justify-content:flex-end;gap:9px;padding:14px 18px 0}
+.org-chart-scroll{overflow-x:auto;padding:24px 22px 36px}
+.org-chart{min-width:1480px;max-width:1800px;margin:0 auto;position:relative}
+.org-person-box{position:relative;z-index:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:6px;min-height:70px;padding:12px 10px;background:#fff;border:1.5px solid #d6deeb;border-top:4px solid #1d315f;border-radius:10px;box-shadow:0 4px 12px rgba(19,37,77,.07);overflow-wrap:anywhere}
+.org-person-position{font-size:9px;line-height:1.35;font-weight:800;letter-spacing:.035em;color:#997400;text-transform:uppercase}
+.org-person-box strong{font-size:12px;line-height:1.4;font-weight:800;color:#17264a}
+.org-person-box.is-empty{border-style:dashed;background:#fafbfe;box-shadow:none}
+.org-person-box.is-empty strong{color:#9aa4b7;font-weight:600}
+.org-root-node{width:320px;margin:0 auto;position:relative;z-index:2}
+.org-root-node .org-person-box{min-height:86px;border-top-color:#e2b900;background:#fffdf3}
+.org-root-node .org-person-position{font-size:11px}
+.org-root-node .org-person-box strong{font-size:17px}
+.org-root-stem{height:38px;width:2px;background:#aab5c9;margin:0 auto}
+.org-major-branches{position:relative;display:grid;grid-template-columns:250px repeat(3,minmax(370px,1fr));gap:16px;align-items:start;padding-top:26px}
+.org-major-branches:before{content:"";position:absolute;top:0;left:8%;right:8%;height:2px;background:#aab5c9}
+.org-executive-branch,.org-field-branch{position:relative;min-width:0;background:#f8f9fc;border:1px solid #e1e6f0;border-radius:14px;padding:16px 13px 18px}
+.org-executive-branch:before,.org-field-branch:before{content:"";position:absolute;left:50%;top:-27px;height:27px;border-left:2px solid #aab5c9}
+.org-branch-title{text-align:center;padding:2px 4px 17px}
+.org-branch-title span,.org-field-heading span{font-size:9px;font-weight:900;letter-spacing:.15em;color:#9a7900}
+.org-branch-title strong{display:block;font-size:13px;color:#1b2d55;margin-top:5px}
+.org-executive-grid{display:grid;grid-template-columns:1fr;gap:14px;position:relative;padding-top:9px}
+.org-exec-node{position:relative}
+.org-exec-node:before{content:"";position:absolute;left:50%;top:-12px;height:12px;border-left:2px solid #aab5c9}
+.org-exec-node .org-person-box{min-height:82px}
+.org-field-branch{padding:14px 13px 20px}
+.org-field-heading{position:relative;text-align:center;background:#17264f;color:#fff;border-radius:10px;padding:12px 10px;margin-bottom:0}
+.org-field-heading span{color:#f1ce44}
+.org-field-heading h3{font-size:15px;line-height:1.35;color:#fff;margin:5px 0 0}
+.org-field-leaders{position:relative;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;padding-top:30px}
+.org-field-leaders:before{content:"";position:absolute;left:25%;right:25%;top:14px;border-top:2px solid #aab5c9}
+.org-field-leaders .org-person-box:before{content:"";position:absolute;left:50%;top:-16px;height:16px;border-left:2px solid #aab5c9}
+.org-field-leaders .org-person-box{min-height:90px}
+.org-leader-to-bureau{height:34px;width:2px;margin:0 auto;background:#aab5c9}
+.org-bureau-stack{position:relative;display:grid;gap:16px}
+.org-bureau-stack:before{content:"";position:absolute;top:-34px;bottom:20px;left:50%;border-left:2px solid #aab5c9}
+.org-bureau-row{position:relative;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;padding-top:22px}
+.org-bureau-row:before{content:"";position:absolute;left:25%;right:25%;top:0;border-top:2px solid #aab5c9}
+.org-bureau-card{position:relative;z-index:1;min-width:0;background:#fff;border:1px solid #dce3ef;border-radius:11px;overflow:visible;box-shadow:0 3px 10px rgba(19,37,77,.045)}
+.org-bureau-card:before{content:"";position:absolute;top:-23px;left:50%;height:22px;border-left:2px solid #aab5c9}
+.org-bureau-heading{background:#e9edf5;padding:10px 9px;text-align:center;border-radius:10px 10px 0 0}
+.org-bureau-heading span{display:block;font-size:8px;font-weight:900;letter-spacing:.16em;color:#967500}
+.org-bureau-heading strong{display:block;font-size:12px;line-height:1.35;color:#192b54;margin-top:4px}
+.org-bureau-people{padding:9px;display:grid;gap:7px}
+.org-coordinator-label,.org-members-label{font-size:8px;font-weight:900;letter-spacing:.1em;color:#77839a;text-transform:uppercase;margin-top:2px}
+.org-bureau-card .org-person-box{min-height:58px;padding:8px 6px;border-radius:8px}
+.org-bureau-card .org-person-position{font-size:8px}
+.org-bureau-card .org-person-box strong{font-size:10px}
+.org-no-members,.org-empty{font-size:10px;color:#9aa4b7;text-align:center;padding:10px;border:1px dashed #d6deeb;border-radius:8px}
+.org-document-footer{border-top:1px solid #e8ecf3;padding:14px 18px;text-align:center;font-size:10px;color:#8791a4}
+.public-structure-main .org-document{box-shadow:0 8px 28px rgba(20,34,69,.05)}
+@media(max-width:700px){
+  .org-document-heading{padding:24px 14px 18px}
+  .org-directory-actions{justify-content:stretch;flex-wrap:wrap}
+  .org-directory-actions>*{flex:1;text-align:center;justify-content:center}
+  .org-chart-scroll{padding:18px 12px 26px}
+}
+@media print{
+  body{background:#fff!important}
+  .sidebar,.topbar,.org-directory-actions,.public-structure-top,.toast{display:none!important}
+  .org-document{border:0;box-shadow:none}
+  .org-chart-scroll{overflow:visible;padding:8mm 3mm}
+  .org-chart{transform:scale(.72);transform-origin:top left;width:138%;min-width:138%}
+  .org-document-heading{padding:8mm 3mm 5mm}
+  .org-document-footer{padding:4mm}
+  @page{size:A3 landscape;margin:8mm}
+}
