@@ -1,7 +1,8 @@
 name: Deploy SIGAP PMII FEBI
 on:
-  push:
-    branches: [main]
+  # The repository's GitHub Pages managed workflow publishes every push to main.
+  # Keep this diagnostic/manual workflow separate to avoid two deploy jobs
+  # competing for the same "pages" concurrency group and environment.
   workflow_dispatch:
 
 permissions:
