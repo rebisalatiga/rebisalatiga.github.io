@@ -34,7 +34,7 @@ Ketua Rayon → Sekretaris Umum dan Bendahara Umum → Kepala Bidang serta Sekre
 
 ## Menjalankan / menerbitkan website
 
-Repository ini memakai GitHub Pages dan workflow pada `.github/workflows/deploy.yml`. Setiap perubahan pada branch `main` memicu proses deploy.
+Website diterbitkan oleh workflow GitHub Pages bawaan repository pada setiap push ke branch `main`. Workflow `.github/workflows/deploy.yml` disimpan sebagai pemeriksaan/deploy manual melalui menu Actions agar tidak bertabrakan dengan workflow Pages otomatis.
 
 Pengaturan GitHub Pages:
 1. Repository → Settings → Pages.
