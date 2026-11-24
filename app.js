@@ -4,7 +4,7 @@ const KEY = CONFIG.SUPABASE_PUBLISHABLE_KEY || "";
 const root = document.getElementById("app");
 const state = {
   session: null, user: null, profile: null, profiles: [], units: [], periods: [],
-  memberships: [], criteria: [], evaluations: [], scores: [], reports: [],
+  memberships: [], roster: [], criteria: [], evaluations: [], scores: [], reports: [],
   view: "overview", periodId: "", authMode: "login", busy: false
 };
 const $ = (selector, scope=document) => scope.querySelector(selector);
@@ -14,7 +14,7 @@ const dateText = value => value ? new Date(value).toLocaleDateString("id-ID",{da
 const roleLabels = {
   admin:"Admin Sistem", ketua_rayon:"Ketua Rayon", sekretaris_umum:"Sekretaris Umum",
   bendahara_umum:"Bendahara Umum", kepala_bidang:"Kepala Bidang",
-  koordinator_biro:"Koordinator Biro", anggota:"Anggota"
+  sekretaris_bidang:"Sekretaris Bidang", koordinator_biro:"Koordinator Biro", anggota:"Anggota"
 };
 function toast(message, error=false) {
   const el=$("#toast"); if(!el) return;
@@ -100,12 +100,13 @@ async function loadData() {
     api("org_units?select=*&is_active=eq.true&order=sort_order.asc"),
     api("evaluation_periods?select=*&order=created_at.desc"),
     api("memberships?select=*&status=eq.active"),
+    api("member_roster?select=*&order=full_name.asc"),
     api("evaluation_criteria?select=*&is_active=eq.true&order=sort_order.asc"),
     api("evaluations?select=*&order=created_at.desc"),
     api("evaluation_scores?select=*&order=created_at.desc"),
     api("activity_reports?select=*&order=created_at.desc")
   ]);
-  [state.profiles,state.units,state.periods,state.memberships,state.criteria,state.evaluations,state.scores,state.reports]=results;
+  [state.profiles,state.units,state.periods,state.memberships,state.roster,state.criteria,state.evaluations,state.scores,state.reports]=results;
   if(!state.periodId || !state.periods.some(p=>p.id===state.periodId)) {
     state.periodId=state.periods.find(p=>p.status==="active")?.id || state.periods[0]?.id || "";
   }
@@ -143,7 +144,7 @@ function renderShell() {
   root.innerHTML='<div class="app-shell"><aside class="sidebar" id="sidebar"><div class="side-brand"><div class="brand-mark">P</div><div><strong>SIGAP PMII FEBI</strong><small>Ruang kerja kepengurusan</small></div></div>'+
     '<div class="nav-label">Menu utama</div><nav class="nav-list">'+
       navItem("overview","⌂","Dashboard")+navItem("structure","⌘","Struktur organisasi")+navItem("evaluations","✓","Penilaian & evaluasi")+navItem("reports","▤","Laporan kegiatan")+
-    '</nav>'+(canApproveAccounts()?'<div class="nav-label">Persetujuan</div><nav class="nav-list">'+navItem("approvals","✓","Persetujuan akun")+'</nav>':'')+(isAdmin()?'<div class="nav-label">Administrasi sistem</div><nav class="nav-list">'+navItem("admin","⚙","Panel admin")+'</nav>':'')+
+    '</nav>'+(manageableUnits().length?'<div class="nav-label">Data kepengurusan</div><nav class="nav-list">'+navItem("roster","♧","Data anggota & rapor")+'</nav>':'')+(canApproveAccounts()?'<div class="nav-label">Persetujuan</div><nav class="nav-list">'+navItem("approvals","✓","Persetujuan akun")+'</nav>':'')+(isAdmin()?'<div class="nav-label">Administrasi sistem</div><nav class="nav-list">'+navItem("admin","⚙","Panel admin")+'</nav>':'')+
     '<div class="side-bottom"><div class="user-mini"><div class="avatar">'+esc((profile.full_name||"P").slice(0,1).toUpperCase())+'</div><div><strong>'+esc(profile.full_name||"Pengurus")+'</strong><small>'+esc(roleLabels[firstRole]||"Pengurus")+'</small></div></div><button class="nav-item" id="logout" style="width:100%">⇥ Keluar dari akun</button></div></aside>'+
     '<main class="main-area"><header class="topbar"><div style="display:flex;align-items:center;gap:12px"><button class="mobile-menu" id="mobile-menu" aria-label="Buka menu">☰</button><div><div class="top-title">PMII Fakultas Ekonomi dan Bisnis Islam</div><div class="top-sub">Sistem evaluasi dan pengembangan kepengurusan</div></div></div>'+
     '<div class="top-actions">'+(state.periods.length?'<select class="period-select" id="period-select" aria-label="Periode kepengurusan">'+state.periods.map(x=>'<option value="'+esc(x.id)+'" '+(x.id===state.periodId?"selected":"")+'>'+esc(x.name)+(x.status==="active"?" · Aktif":"")+'</option>').join("")+'</select>':'')+'<button class="btn btn-ghost" id="refresh-data">↻</button></div></header><section class="page" id="page-content">'+renderView()+'</section></main></div>';
@@ -168,9 +169,14 @@ function renderOverview() {
     '<section class="panel"><div class="panel-head"><div><h3>Identitas kepengurusan</h3><p>Ringkasan akun Anda</p></div></div><div class="stack"><div><div class="tiny muted">NAMA PENGURUS</div><strong>'+esc(state.profile?.full_name||"—")+'</strong></div><div><div class="tiny muted">EMAIL</div><strong class="small">'+esc(state.user?.email||"—")+'</strong></div><div><div class="tiny muted">JABATAN / ROLE</div><strong class="small">'+esc(myRoles.join(", ")||"Belum ditetapkan")+'</strong></div><div><div class="tiny muted">PERIODE TERPILIH</div><strong class="small">'+esc(p?.name||"Belum tersedia")+'</strong></div></div></section></div>';
 }
 function personChips(unit) {
-  const people=state.memberships.filter(m=>m.unit_id===unit.id && m.status==="active");
-  if(!people.length) return '<div class="unit-people"><span class="person-chip">Belum ada penempatan pengurus</span></div>';
-  return '<div class="unit-people">'+people.map(m=>'<span class="person-chip">'+esc(memberName(m))+' · '+esc(roleLabels[m.role]||m.role)+'</span>').join("")+'</div>';
+  const periodId=periodActive()?.id;
+  const officers=state.memberships.filter(m=>m.unit_id===unit.id && m.status==="active" && (m.role==="admin" || !periodId || m.period_id===periodId));
+  const roster=state.roster.filter(m=>m.unit_id===unit.id && m.is_active && (!periodId || m.period_id===periodId));
+  const chips=[
+    ...officers.map(m=>'<span class="person-chip">'+esc(memberName(m))+' · '+esc(roleLabels[m.role]||m.role)+'</span>'),
+    ...roster.map(m=>'<span class="person-chip">'+esc(m.full_name)+' · '+esc(m.position_title||"Anggota")+'</span>')
+  ];
+  return '<div class="unit-people">'+(chips.length?chips.join(""):'<span class="person-chip">Belum ada anggota tercatat</span>')+'</div>';
 }
 function renderStructure() {
   const rootUnit=state.units.find(u=>u.code==="pmii-febi");
@@ -185,29 +191,56 @@ function descendantsOf(unitId) {
   while(changed){changed=false;for(const u of state.units){if(u.parent_id && found.has(u.parent_id) && !found.has(u.id)){found.add(u.id);changed=true;}}}
   return found;
 }
+function canManageUnit(unitId) {
+  if(isAdmin()) return true;
+  const periodId=periodActive()?.id;
+  return !!periodId && ownMemberships().some(m=>m.period_id===periodId && (
+    m.role==="ketua_rayon" ||
+    (["sekretaris_umum","bendahara_umum"].includes(m.role) && m.unit_id===unitId) ||
+    (["kepala_bidang","sekretaris_bidang"].includes(m.role) && descendantsOf(m.unit_id).has(unitId)) ||
+    (m.role==="koordinator_biro" && m.unit_id===unitId)
+  ));
+}
+function manageableUnits() {
+  return state.units.filter(u=>canManageUnit(u.id));
+}
+function managerMembershipForUnit(unitId) {
+  const periodId=periodActive()?.id;
+  return ownMemberships().find(m=>m.role==="admin") ||
+    ownMemberships().find(m=>m.period_id===periodId && canManageUnit(unitId)) || null;
+}
 function canEvaluateTarget(target) {
   if(!target) return false;
-  const evaluator=ownEvaluatorMembership();
-  if(isAdmin() || evaluator?.role==="ketua_rayon" || evaluator?.role==="sekretaris_umum" || evaluator?.role==="bendahara_umum") return true;
-  if(!evaluator) return false;
-  if(target.user_id===state.user.id) return true;
-  if(evaluator.role==="kepala_bidang") return descendantsOf(evaluator.unit_id).has(target.unit_id);
-  if(evaluator.role==="koordinator_biro") return evaluator.unit_id===target.unit_id;
-  return false;
+  return target.user_id===state.user?.id || canManageUnit(target.unit_id);
 }
 function evaluationTargets() {
-  const own=ownEvaluatorMembership();
-  return activeMemberships().filter(m=>canEvaluateTarget(m) && (isAdmin() || own?.role!=="anggota" || m.user_id===state.user.id));
+  const registered=activeMemberships()
+    .filter(m=>canEvaluateTarget(m))
+    .map(m=>({
+      ref:"membership:"+m.id,target_type:"membership",target_id:m.id,
+      full_name:memberName(m),unit_id:m.unit_id,position_title:roleLabels[m.role]||m.role
+    }));
+  const nominal=state.roster
+    .filter(m=>m.is_active && m.period_id===periodActive()?.id && canManageUnit(m.unit_id))
+    .map(m=>({
+      ref:"roster:"+m.id,target_type:"roster",target_id:m.id,
+      full_name:m.full_name,unit_id:m.unit_id,position_title:m.position_title||"Anggota"
+    }));
+  return [...nominal,...registered].sort((a,b)=>a.full_name.localeCompare(b.full_name,"id"));
 }
 function renderEvaluationCard(e) {
-  const target=state.memberships.find(m=>m.id===e.subject_membership_id);
+  const rosterTarget=e.subject_roster_id?state.roster.find(m=>m.id===e.subject_roster_id):null;
+  const target=e.subject_membership_id?state.memberships.find(m=>m.id===e.subject_membership_id):null;
   const evaluator=state.memberships.find(m=>m.id===e.evaluator_membership_id);
   const values=state.scores.filter(s=>s.evaluation_id===e.id);
   let weighted=0,weightTotal=0;
   for(const s of values){const c=state.criteria.find(x=>x.id===s.criterion_id);if(c){weighted+=Number(s.score)*Number(c.weight);weightTotal+=Number(c.weight);}}
   const score=weightTotal?(weighted/weightTotal*20).toFixed(1):"—";
+  const displayName=rosterTarget?.full_name||(target?memberName(target):"Pengurus");
+  const displayUnit=unitFor(rosterTarget?.unit_id||target?.unit_id)?.name||"";
+  const displayPosition=rosterTarget?.position_title||(target?roleLabels[target.role]||target.role:"");
   const reviewAction=isAdmin()&&e.status==="submitted" ? '<div style="margin-top:12px"><button class="btn btn-ghost" data-review-evaluation="'+e.id+'">Tandai sudah ditinjau</button></div>' : "";
-  return '<article class="eval-card"><div class="eval-meta"><div><h4>'+esc(target?memberName(target):"Pengurus")+'</h4><div class="tiny muted">'+esc(target?unitName(target):"")+' · Dinilai oleh '+esc(evaluator?memberName(evaluator):"Pengurus")+'</div></div><span class="badge '+(e.status==="submitted"?"gold":e.status==="reviewed"?"":"grey")+'">'+esc(e.status==="submitted"?"Terkirim":e.status==="reviewed"?"Ditinjau":"Draft")+'</span></div><p>'+esc(e.strengths||"Belum ada catatan kekuatan.")+'</p><div class="small"><strong>Nilai akhir: '+score+(score==="—"?"":" / 100")+'</strong> <span class="muted">· '+dateText(e.created_at)+'</span></div><div class="tiny muted" style="margin-top:7px">Perbaikan: '+esc(e.improvements||"—")+' · Kendala: '+esc(e.obstacles||"—")+' · Rekomendasi: '+esc(e.recommendations||"—")+'</div>'+reviewAction+'</article>';
+  return '<article class="eval-card"><div class="eval-meta"><div><h4>'+esc(displayName)+'</h4><div class="tiny muted">'+esc(displayUnit)+' · '+esc(displayPosition)+' · Dinilai oleh '+esc(evaluator?memberName(evaluator):"Pengurus")+'</div></div><span class="badge '+(e.status==="submitted"?"gold":e.status==="reviewed"?"":"grey")+'">'+esc(e.status==="submitted"?"Terkirim":e.status==="reviewed"?"Ditinjau":"Draft")+'</span></div><p>'+esc(e.strengths||"Belum ada catatan kekuatan.")+'</p><div class="small"><strong>Nilai akhir: '+score+(score==="—"?"":" / 100")+'</strong> <span class="muted">· '+dateText(e.created_at)+'</span></div><div class="tiny muted" style="margin-top:7px">Perbaikan: '+esc(e.improvements||"—")+' · Kendala: '+esc(e.obstacles||"—")+' · Rekomendasi: '+esc(e.recommendations||"—")+'</div>'+reviewAction+'</article>';
 }
 function renderEvaluations() {
   const p=periodActive();
@@ -216,21 +249,13 @@ function renderEvaluations() {
   const targets=evaluationTargets();
   const evaluator=ownEvaluatorMembership();
   const list=state.evaluations.filter(e=>e.period_id===p.id);
-  const form= evaluator && targets.length ? '<section class="panel"><div class="panel-head"><div><h3>Buat penilaian baru</h3><p>Lengkapi skor dan evaluasi agar penilaian bermakna.</p></div><span class="badge gold">'+esc(p.name)+'</span></div><form id="evaluation-form"><div class="field"><label>Pengurus yang dinilai</label><select name="subject_membership_id" required><option value="">Pilih pengurus</option>'+targets.map(m=>'<option value="'+m.id+'">'+esc(memberName(m))+' · '+esc(unitName(m))+' · '+esc(roleLabels[m.role]||m.role)+'</option>').join("")+'</select></div>'+
+  const form= evaluator && targets.length ? '<section class="panel"><div class="panel-head"><div><h3>Buat penilaian baru</h3><p>Nama anggota dapat dinilai meskipun belum mempunyai akun SIGAP.</p></div><span class="badge gold">'+esc(p.name)+'</span></div><form id="evaluation-form"><div class="field"><label>Anggota yang dinilai</label><select name="subject_ref" required><option value="">Pilih nama anggota</option>'+targets.map(m=>'<option value="'+m.ref+'">'+esc(m.full_name)+' · '+esc(unitFor(m.unit_id)?.name||"Unit")+' · '+esc(m.position_title)+'</option>').join("")+'</select></div>'+
     '<div class="notice">Skala nilai: 1 Sangat Kurang · 2 Kurang · 3 Cukup · 4 Baik · 5 Sangat Baik. Bobot indikator berjumlah 100%.</div>'+
     criteria.map(c=>'<div class="criterion-row"><div><strong>'+esc(c.name)+' <span class="muted">('+Number(c.weight)+'%)</span></strong><small>'+esc(c.description||"")+'</small></div><select name="score_'+c.id+'" required><option value="3">3 · Cukup</option><option value="1">1 · Sangat kurang</option><option value="2">2 · Kurang</option><option value="4">4 · Baik</option><option value="5">5 · Sangat baik</option></select></div>').join("")+
     '<div class="field"><label>Hal yang sudah berjalan baik</label><textarea name="strengths" placeholder="Tuliskan capaian atau praktik baik…"></textarea></div><div class="field"><label>Hal yang perlu ditingkatkan</label><textarea name="improvements" placeholder="Tuliskan kekurangan yang perlu diperbaiki…"></textarea></div><div class="field"><label>Kendala yang dihadapi</label><textarea name="obstacles" placeholder="Tuliskan kendala yang ditemukan…"></textarea></div><div class="field"><label>Rekomendasi dan target berikutnya</label><textarea name="recommendations" placeholder="Tuliskan langkah perbaikan…"></textarea></div><div class="form-actions"><button class="btn" type="submit">Kirim penilaian</button></div></form></section>' :
     '<div class="notice warn">Belum ada penugasan aktif yang dapat digunakan untuk menilai pada periode ini. Anggota dapat melihat penilaian diri setelah memiliki penugasan.</div>';
   return pageHeading("Penilaian & evaluasi","Nilai kinerja berdasarkan indikator, bukti, dan catatan pembinaan.")+
     '<div class="split"><div class="stack">'+form+'</div><section class="panel"><div class="panel-head"><div><h3>Riwayat penilaian</h3><p>Penilaian yang dapat Anda akses</p></div><span class="badge">'+list.length+' catatan</span></div><div class="eval-grid">'+(list.length?list.map(renderEvaluationCard).join(""):'<div class="empty"><strong>Belum ada penilaian</strong>Penilaian akan muncul di sini setelah dikirim.</div>')+'</div></section></div>';
-}
-function canManageUnit(unitId) {
-  if(isAdmin()) return true;
-  return ownMemberships().some(m=>
-    m.role==="ketua_rayon" ||
-    (m.role==="kepala_bidang" && descendantsOf(m.unit_id).has(unitId)) ||
-    (m.role==="koordinator_biro" && m.unit_id===unitId)
-  );
 }
 function renderReportCard(r) {
   const unit=unitFor(r.unit_id);
@@ -310,6 +335,7 @@ function renderApprovals() {
 }
 function renderView() {
   if(state.view==="approvals" && canApproveAccounts()) return renderApprovals();
+  if(state.view==="roster" && manageableUnits().length) return renderRoster();
   if(state.view==="structure") return renderStructure();
   if(state.view==="evaluations") return renderEvaluations();
   if(state.view==="reports") return renderReports();
@@ -358,9 +384,13 @@ async function submitEvaluation(form) {
   const values=Object.fromEntries(new FormData(form).entries());
   const p=periodActive(); const evaluator=ownEvaluatorMembership();
   if(!p || !evaluator) throw new Error("Periode atau penugasan evaluator belum tersedia.");
+  const [subjectType,subjectId]=String(values.subject_ref||"").split(":");
+  if(!subjectId || !["roster","membership"].includes(subjectType)) throw new Error("Pilih anggota yang akan dinilai.");
   const criteria=state.criteria.filter(c=>c.period_id===null || c.period_id===p.id);
   const created=await api("evaluations",{method:"POST",body:JSON.stringify({
-    period_id:p.id,evaluator_membership_id:evaluator.id,subject_membership_id:values.subject_membership_id,
+    period_id:p.id,evaluator_membership_id:evaluator.id,
+    subject_membership_id:subjectType==="membership"?subjectId:null,
+    subject_roster_id:subjectType==="roster"?subjectId:null,
     status:"draft",strengths:values.strengths||null,improvements:values.improvements||null,
     obstacles:values.obstacles||null,recommendations:values.recommendations||null
   })});
@@ -407,7 +437,7 @@ async function assignRole(form) {
   const role=v.role;
   const allowed={
     admin:["rayon"],ketua_rayon:["rayon"],sekretaris_umum:["executive"],bendahara_umum:["executive"],
-    kepala_bidang:["field"],koordinator_biro:["bureau"],anggota:["bureau"]
+    kepala_bidang:["field"],sekretaris_bidang:["field"],koordinator_biro:["bureau"],anggota:["bureau"]
   };
   if(!unit || !allowed[role]?.includes(unit.unit_type)) throw new Error("Unit organisasi tidak sesuai dengan role yang dipilih.");
   const periodId=role==="admin"?null:v.period_id;
