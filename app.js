@@ -6,7 +6,7 @@ const state = {
   session: null, user: null, profile: null, profiles: [], units: [], periods: [],
   memberships: [], roster: [], criteria: [], evaluations: [], scores: [], reports: [],
   publicStructure: [], publicMode: false, evaluationMode: "individual",
-  systemSettings: null, auditLogs: [],
+  systemSettings: null, auditLogs: [], adminAccounts: [],
   view: "overview", periodId: "", authMode: "login", busy: false, searchQuery: ""
 };
 const $ = (selector, scope=document) => scope.querySelector(selector);
@@ -754,7 +754,24 @@ function renderAdminSettings(){
   }).join(""):'<tr><td colspan="4"><div class="empty compact-empty">Belum ada aktivitas yang tercatat.</div></td></tr>';
   return pageHeading("Pengaturan sistem","Kelola password akun anggota, identitas aplikasi, dan preferensi tampilan SIGAP.")+
     '<div class="settings-overview"><div><span class="eyebrow">AKUN ADMIN</span><strong>'+esc(state.profile?.full_name||"Administrator")+'</strong><small>'+esc(state.user?.email||"")+'</small></div><span class="badge success">Hak akses admin aktif</span></div>'+
-    '<div class="settings-grid">'+
+    '<section class="panel account-management-panel"><div class="panel-head"><div><h3>Seluruh akun terdaftar</h3><p>'+state.adminAccounts.length+' akun · termasuk akun yang belum memiliki jabatan aktif.</p></div><button class="btn btn-ghost" type="button" data-refresh-admin-accounts>Perbarui daftar</button></div>'+
+    (state.adminAccounts.length?'<div class="account-management-list">'+state.adminAccounts.map(account=>{
+      const membership=(account.memberships||[]).find(m=>m.status==="active")||(account.memberships||[])[0]||null;
+      const unitOptions=state.units.map(u=>'<option value="'+u.id+'" '+(membership?.unit_id===u.id?'selected':'')+'>'+esc(u.name)+'</option>').join("");
+      const roleOptions=Object.entries(roleLabels).map(([key,label])=>'<option value="'+key+'" '+(membership?.role===key?'selected':'')+'>'+esc(label)+'</option>').join("");
+      const membershipOptions=(account.memberships||[]).map(m=>'<option value="'+m.id+'" '+(membership?.id===m.id?'selected':'')+'>'+esc(m.position_title||roleLabels[m.role]||m.role)+' · '+esc(m.status)+'</option>').join("");
+      return '<details class="account-management-item"><summary><span><strong>'+esc(account.full_name||"Tanpa nama")+'</strong><small>'+esc(account.email||"Email tidak tersedia")+' · '+esc(account.nim||"Tanpa NIM")+'</small></span><span class="badge '+(account.account_status==="active"?"success":"gold")+'">'+esc(account.account_status)+'</span></summary>'+
+        '<form class="account-edit-form" data-account-id="'+account.id+'"><input type="hidden" name="target_user_id" value="'+account.id+'">'+
+        '<div class="account-edit-grid">'+
+        '<div class="field"><label>Email login</label><input type="email" name="email" required value="'+esc(account.email||"")+'"></div>'+
+        '<div class="field"><label>Nama lengkap</label><input name="full_name" required maxlength="120" value="'+esc(account.full_name||"")+'"></div>'+
+        '<div class="field"><label>NIM</label><input name="nim" value="'+esc(account.nim||"")+'"></div>'+
+        '<div class="field"><label>Angkatan</label><input name="cohort" value="'+esc(account.cohort||"")+'"></div>'+
+        '<div class="field"><label>Nomor HP</label><input name="phone" value="'+esc(account.phone||"")+'"></div>'+
+        '<div class="field"><label>Status akun</label><select name="account_status">'+["pending","active","rejected","suspended"].map(v=>'<option value="'+v+'" '+(account.account_status===v?'selected':'')+'>'+v+'</option>').join("")+'</select></div>'+
+        (membership?'<div class="field"><label>Penugasan yang diedit</label><select name="membership_id">'+membershipOptions+'</select></div><div class="field"><label>Role</label><select name="role">'+roleOptions+'</select></div><div class="field"><label>Unit organisasi</label><select name="unit_id">'+unitOptions+'</select></div><div class="field"><label>Nama jabatan</label><input name="position_title" value="'+esc(membership.position_title||"")+'"></div>':'<div class="notice">Akun ini belum memiliki penugasan jabatan. Tetapkan jabatan melalui menu administrasi setelah menyimpan profil.</div>')+
+        '</div><div class="form-actions"><button class="btn" type="submit">Simpan perubahan akun</button></div></form></details>';
+    }).join("")+'</div>':'<div class="empty">Belum ada akun terdaftar.</div>')+'</section>'+'<div class="settings-grid">'+
       '<section class="panel settings-panel"><div class="panel-head"><div><h3>Reset password anggota</h3><p>'+resettableProfiles.length+' akun anggota aktif tersedia untuk diatur ulang.</p></div><span class="settings-icon">⌑</span></div>'+
         (resettableProfiles.length?
           '<form id="admin-reset-member-password-form">'+
@@ -824,13 +841,36 @@ async function signOut() {
   saveSession(null); state.user=null; state.profile=null; state.publicMode=false; renderAuth();
 }
 
+async function adminAccountRequest(payload){
+  if(!isAdmin()) throw new Error("Hanya Admin Sistem yang dapat mengelola seluruh akun.");
+  const response=await fetch(API+"/functions/v1/admin-reset-password",{
+    method:"POST",headers:{"apikey":KEY,"Authorization":"Bearer "+(state.session?.access_token||""),"Content-Type":"application/json"},
+    body:JSON.stringify(payload)
+  });
+  const result=await response.json().catch(()=>({}));
+  if(!response.ok) throw new Error(result.error||"Permintaan pengelolaan akun gagal.");
+  return result;
+}
+async function loadAdminAccounts(){
+  const result=await adminAccountRequest({action:"list"});
+  state.adminAccounts=result.accounts||[];
+}
+async function updateAdminAccount(form){
+  const values=Object.fromEntries(new FormData(form).entries());
+  const account=state.adminAccounts.find(a=>a.id===values.target_user_id);
+  if(!account) throw new Error("Akun tidak ditemukan dalam daftar.");
+  const payload={action:"update",...values};
+  if(!values.membership_id){delete payload.membership_id;delete payload.role;delete payload.unit_id;delete payload.position_title;}
+  await adminAccountRequest(payload);
+  toast("Detail akun berhasil diperbarui.");
+  await loadData();await loadAdminAccounts();renderShell();
+}
 async function resetMemberPassword(form){
   if(!isAdmin()) throw new Error("Hanya Admin Sistem yang dapat mereset password anggota.");
   const values=Object.fromEntries(new FormData(form).entries());
   const target=state.profiles.find(p=>p.id===values.target_user_id);
-  const hasActiveMembership=state.memberships.some(m=>m.user_id===values.target_user_id && m.status==="active" && m.role!=="admin");
-  if(!target || target.account_status!=="active" || !hasActiveMembership || target.id===state.user?.id){
-    throw new Error("Akun anggota tidak valid, tidak aktif, atau bukan akun anggota lain.");
+  if(!target || target.id===state.user?.id){
+    throw new Error("Pilih akun lain yang terdaftar. Password akun admin sendiri tidak diubah dari menu ini.");
   }
   if(values.new_password.length<8 || values.new_password.length>72){
     throw new Error("Password baru harus terdiri dari 8 sampai 72 karakter.");
@@ -845,7 +885,7 @@ async function resetMemberPassword(form){
       "Authorization":"Bearer "+(state.session?.access_token||""),
       "Content-Type":"application/json"
     },
-    body:JSON.stringify({target_user_id:target.id,new_password:values.new_password})
+    body:JSON.stringify({action:"reset_password",target_user_id:target.id,new_password:values.new_password})
   });
   const payload=await response.json().catch(()=>({}));
   if(!response.ok) throw new Error(payload.error||payload.message||"Password anggota gagal diperbarui.");
@@ -989,10 +1029,14 @@ document.addEventListener("click",async event=>{
     state.view=view.dataset.view;
     renderShell();
     if(state.view==="settings" && isAdmin()){
-      try{state.auditLogs=await api("audit_logs?select=*&order=created_at.desc&limit=20");renderShell();}
+      try{await Promise.all([loadAdminAccounts(),api("audit_logs?select=*&order=created_at.desc&limit=20").then(rows=>state.auditLogs=rows)]);renderShell();}
       catch(e){toast("Riwayat aktivitas tidak dapat dimuat: "+e.message,true);}
     }
     return;
+  }
+  if(event.target.closest("[data-refresh-admin-accounts]")){
+    const control=event.target.closest("[data-refresh-admin-accounts]");control.disabled=true;
+    try{await loadAdminAccounts();renderShell();toast("Daftar akun diperbarui.");}catch(e){toast(e.message,true);control.disabled=false;}return;
   }
   if(event.target.closest("[data-refresh-audit]")){
     const control=event.target.closest("[data-refresh-audit]");control.disabled=true;
@@ -1098,6 +1142,16 @@ document.addEventListener("keydown",event=>{
   else {renderShell();toast("Tidak ada data yang cocok dengan pencarian.",true);}
 });
 document.addEventListener("change",event=>{
+  if(event.target.matches(".account-edit-form select[name='membership_id']")){
+    const form=event.target.closest("form");
+    const account=state.adminAccounts.find(a=>a.id===form?.dataset.accountId);
+    const membership=account?.memberships?.find(m=>m.id===event.target.value);
+    if(membership){
+      const role=form.elements.namedItem("role");const unit=form.elements.namedItem("unit_id");const position=form.elements.namedItem("position_title");
+      if(role)role.value=membership.role;if(unit)unit.value=membership.unit_id;if(position)position.value=membership.position_title||"";
+    }
+  }
+
   if(event.target.id==="period-select"){state.periodId=event.target.value;loadData().then(()=>renderShell()).catch(e=>toast(e.message,true));}
 });
 document.addEventListener("submit",async event=>{
@@ -1105,6 +1159,7 @@ document.addEventListener("submit",async event=>{
   const handlers={
     "auth-form":()=>handleAuth(form),
     "admin-reset-member-password-form":()=>resetMemberPassword(form),
+    "account-edit-form":()=>updateAdminAccount(form),
     "system-settings-form":()=>saveSystemSettings(form),
     "individual-evaluation-form":()=>submitEvaluation(form,"individual"),
     "bureau-evaluation-form":()=>submitEvaluation(form,"bureau"),
