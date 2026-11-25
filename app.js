@@ -6,9 +6,20 @@ const state = {
   session: null, user: null, profile: null, profiles: [], units: [], periods: [],
   memberships: [], roster: [], criteria: [], evaluations: [], scores: [], reports: [],
   publicStructure: [], publicMode: false, evaluationMode: "individual",
+  systemSettings: null, auditLogs: [],
   view: "overview", periodId: "", authMode: "login", busy: false, searchQuery: ""
 };
 const $ = (selector, scope=document) => scope.querySelector(selector);
+const DEFAULT_SYSTEM_SETTINGS = {
+  id:1,
+  app_name:"SIGAP PMII FEBI",
+  app_subtitle:"Sistem Informasi Evaluasi Kepengurusan",
+  login_headline:"Merawat amanah. Menumbuhkan gerakan.",
+  login_description:"Ruang digital pengurus PMII Fakultas Ekonomi dan Bisnis Islam untuk mengelola struktur, mengukur kinerja, dan menyusun evaluasi bersama.",
+  theme_preset:"navy_gold",
+  compact_mode:false
+};
+
 const $$ = (selector, scope=document) => [...scope.querySelectorAll(selector)];
 const esc = value => String(value ?? "").replace(/[&<>"']/g, ch => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[ch]));
 const dateText = value => value ? new Date(value).toLocaleDateString("id-ID",{day:"numeric",month:"short",year:"numeric"}) : "—";
@@ -64,6 +75,45 @@ async function publicApi(path) {
     throw new Error(message);
   }
   return payload;
+}
+
+const SYSTEM_THEMES = {
+  navy_gold:{base:"#111a3d",panel:"#18254f",button:"#203365",accent:"#f2c500",soft:"#fff7d8",paper:"#f3f4f8",line:"#e5e8f0"},
+  ocean_blue:{base:"#10243d",panel:"#183a5d",button:"#24527c",accent:"#69b7e8",soft:"#e7f4fc",paper:"#f2f6fa",line:"#dce6ef"},
+  forest_green:{base:"#12362c",panel:"#1d5139",button:"#28664b",accent:"#d6ad55",soft:"#f7f0df",paper:"#f4f7f4",line:"#e0e9e2"}
+};
+async function loadSystemSettings(){
+  try{
+    const rows=await publicApi("system_settings?select=*&id=eq.1&limit=1");
+    state.systemSettings={...DEFAULT_SYSTEM_SETTINGS,...(rows?.[0]||{})};
+  }catch(error){
+    state.systemSettings={...DEFAULT_SYSTEM_SETTINGS};
+  }
+  applySystemSettings();
+}
+function applySystemSettings(){
+  const settings={...DEFAULT_SYSTEM_SETTINGS,...(state.systemSettings||{})};
+  const theme=SYSTEM_THEMES[settings.theme_preset]||SYSTEM_THEMES.navy_gold;
+  const html=document.documentElement;
+  html.dataset.sigapTheme=SYSTEM_THEMES[settings.theme_preset]?settings.theme_preset:"navy_gold";
+  const variables={
+    "--green-950":theme.base,"--green-900":theme.panel,"--green-800":theme.button,
+    "--green-700":theme.button,"--green-100":theme.soft,"--gold":theme.accent,
+    "--gold-soft":theme.soft,"--paper":theme.paper,"--line":theme.line
+  };
+  Object.entries(variables).forEach(([name,value])=>html.style.setProperty(name,value));
+  document.body.classList.toggle("compact-mode",!!settings.compact_mode);
+  document.title=settings.app_name||DEFAULT_SYSTEM_SETTINGS.app_name;
+  $(".brand-lockup strong,.side-brand strong,.public-structure-brand strong").forEach(node=>{
+    node.textContent=settings.app_name||DEFAULT_SYSTEM_SETTINGS.app_name;
+  });
+  $(".brand-lockup small").forEach(node=>{
+    node.textContent=settings.app_subtitle||DEFAULT_SYSTEM_SETTINGS.app_subtitle;
+  });
+  const heading=$(".hero-copy h1");
+  if(heading) heading.textContent=settings.login_headline||DEFAULT_SYSTEM_SETTINGS.login_headline;
+  const description=$(".hero-copy p");
+  if(description) description.textContent=settings.login_description||DEFAULT_SYSTEM_SETTINGS.login_description;
 }
 function saveSession(session) {
   state.session=session;
@@ -158,11 +208,13 @@ function renderAuth() {
     '<button class="btn btn-block" type="submit">'+(signup?"Daftar akun":"Masuk ke SIGAP")+'</button>'+
     '<div class="auth-switch">'+(signup?'Sudah memiliki akun? <button type="button" class="link-btn" data-auth-mode="login">Masuk</button>':'Belum memiliki akun? <button type="button" class="link-btn" data-auth-mode="signup">Daftar sekarang</button>')+'</div>'+
      '<div class="auth-credit">Dibuat oleh <strong>Dzaky Luqman Abdullah</strong><span>Kepala Bidang Eksternal</span></div></form></section></div>';
+  applySystemSettings();
 }
 function renderPending() {
   const status=state.profile?.account_status || "pending";
   const message=status==="rejected"?"Pendaftaran akun ditolak. Silakan hubungi Ketua Rayon atau pengurus yang memeriksa pendaftaran.":status==="suspended"?"Akses akun sedang dinonaktifkan. Silakan hubungi Admin Sistem.":"Akun Anda sudah terdaftar. Tunggu persetujuan Ketua Rayon, Sekretaris Umum, Bendahara Umum, atau Kepala Bidang";
   root.innerHTML='<div class="pending-wrap"><section class="pending-card"><div class="brand-logo pending-logo"><img src="https://1.bp.blogspot.com/-_LPIjxug5bs/W1YpWUAw0FI/AAAAAAAAAac/26D9u4GoFe0qM9sdOUpfSyV0MH4RO1y0QCLcBGAs/s1600/logo_pmii_hd.png" alt="Logo PMII Rayon Ekonomi Bisnis Islam"></div><div class="pending-icon">⌛</div><div class="eyebrow">SIGAP PMII FEBI</div><h2 style="margin:10px 0">Akun dalam proses</h2><p class="muted" style="line-height:1.7">'+esc(message)+'</p><div style="margin-top:24px"><button class="btn btn-ghost" id="refresh-status">Periksa status lagi</button> <button class="btn" id="logout">Keluar</button></div></section></div>';
+  applySystemSettings();
 }
 function navItem(view,icon,label) {
   return '<button class="nav-item '+(state.view===view?"active":"")+'" data-view="'+view+'"><span class="nav-ico">'+icon+'</span>'+label+'</button>';
@@ -174,10 +226,11 @@ function renderShell() {
   root.innerHTML='<div class="app-shell"><aside class="sidebar" id="sidebar"><div class="side-brand"><div class="brand-logo side-logo"><img src="https://1.bp.blogspot.com/-_LPIjxug5bs/W1YpWUAw0FI/AAAAAAAAAac/26D9u4GoFe0qM9sdOUpfSyV0MH4RO1y0QCLcBGAs/s1600/logo_pmii_hd.png" alt="Logo PMII Rayon Ekonomi Bisnis Islam"></div><div><strong>SIGAP PMII FEBI</strong><small>Ruang kerja kepengurusan</small></div></div>'+
     '<div class="nav-label">Menu utama</div><nav class="nav-list">'+
       navItem("overview","⌂","Dashboard")+navItem("structure","⌘","Struktur organisasi")+navItem("evaluations","✓","Penilaian & evaluasi")+navItem("reports","▤","Laporan kegiatan")+
-    '</nav>'+(manageableUnits().length?'<div class="nav-label">Data kepengurusan</div><nav class="nav-list">'+navItem("roster","♧","Data anggota & rapor")+'</nav>':'')+(canApproveAccounts()?'<div class="nav-label">Persetujuan</div><nav class="nav-list">'+navItem("approvals","✓","Persetujuan akun")+'</nav>':'')+(isAdmin()?'<div class="nav-label">Administrasi sistem</div><nav class="nav-list">'+navItem("admin","⚙","Panel admin")+'</nav>':'')+
+    '</nav>'+(manageableUnits().length?'<div class="nav-label">Data kepengurusan</div><nav class="nav-list">'+navItem("roster","♧","Data anggota & rapor")+'</nav>':'')+(canApproveAccounts()?'<div class="nav-label">Persetujuan</div><nav class="nav-list">'+navItem("approvals","✓","Persetujuan akun")+'</nav>':'')+(isAdmin()?'<div class="nav-label">Administrasi sistem</div><nav class="nav-list">'+navItem("admin","⚙","Panel admin")+navItem("settings","⚙","Pengaturan sistem")+'</nav>':'')+
     '<div class="side-bottom"><div class="user-mini"><div class="avatar">'+esc((profile.full_name||"P").slice(0,1).toUpperCase())+'</div><div><strong>'+esc(profile.full_name||"Pengurus")+'</strong><small>'+esc(roleLabels[firstRole]||"Pengurus")+'</small></div></div><button class="nav-item" id="logout" style="width:100%">⇥ Keluar dari akun</button></div></aside>'+
-    '<main class="main-area"><header class="topbar"><div class="topbar-left"><button class="mobile-menu" id="mobile-menu" aria-label="Buka menu">☰</button><div class="breadcrumb"><span>PMII FEBI</span><b>/</b><strong>'+esc(({overview:"Dashboard",structure:"Struktur organisasi",evaluations:"Penilaian & evaluasi",reports:"Laporan kegiatan",roster:"Data anggota & rapor",approvals:"Persetujuan akun",admin:"Administrasi sistem"})[state.view]||"Dashboard")+'</strong></div></div>'+
+    '<main class="main-area"><header class="topbar"><div class="topbar-left"><button class="mobile-menu" id="mobile-menu" aria-label="Buka menu">☰</button><div class="breadcrumb"><span>PMII FEBI</span><b>/</b><strong>'+esc(({overview:"Dashboard",structure:"Struktur organisasi",evaluations:"Penilaian & evaluasi",reports:"Laporan kegiatan",roster:"Data anggota & rapor",approvals:"Persetujuan akun",admin:"Administrasi sistem",settings:"Pengaturan sistem"})[state.view]||"Dashboard")+'</strong></div></div>'+
     '<div class="top-actions"><label class="global-search"><span>⌕</span><input id="global-search" type="search" value="'+esc(state.searchQuery||"")+'" placeholder="Cari anggota, bidang, atau rapor…" autocomplete="off"></label>'+(state.periods.length?'<select class="period-select" id="period-select" aria-label="Periode kepengurusan">'+state.periods.map(x=>'<option value="'+esc(x.id)+'" '+(x.id===state.periodId?"selected":"")+'>'+esc(x.name)+(x.status==="active"?" · Aktif":"")+'</option>').join("")+'</select>':'')+'<button class="top-icon-button" id="refresh-data" aria-label="Segarkan data">↻</button><div class="top-avatar" title="'+esc(profile.full_name||"Pengurus")+'">'+esc((profile.full_name||"P").slice(0,1).toUpperCase())+'</div></div></header><section class="page" id="page-content">'+renderView()+'</section></main></div>';
+  applySystemSettings();
 }
 function pageHeading(title,desc,action="") {
   return '<div class="page-heading"><div><div class="eyebrow">SIGAP / PMII FEBI</div><h1>'+title+'</h1><p>'+desc+'</p></div>'+action+'</div>';
@@ -677,6 +730,48 @@ function renderAdmin() {
     (active?'<form id="assign-form"><div class="field"><label>Pengurus</label><select name="user_id" required><option value="">Pilih pengurus aktif</option>'+approved.map(p=>'<option value="'+p.id+'">'+esc(p.full_name)+' · '+esc(p.nim||"tanpa NIM")+'</option>').join("")+'</select></div><div class="field"><label>Periode</label><select name="period_id" required><option value="'+active.id+'">'+esc(active.name)+' · Aktif</option>'+periods.filter(p=>p.status!=="active").map(p=>'<option value="'+p.id+'">'+esc(p.name)+' · '+esc(p.status)+'</option>').join("")+'</select></div><div class="field"><label>Jabatan / role</label><select name="role" required><option value="">Pilih role</option>'+Object.entries(roleLabels).map(([key,label])=>'<option value="'+key+'">'+esc(label)+'</option>').join("")+'</select></div><div class="field"><label>Unit organisasi</label><select name="unit_id" required><option value="">Pilih bidang / biro / rayon</option>'+state.units.map(u=>'<option value="'+u.id+'">'+esc(u.name)+'</option>').join("")+'</select></div><div class="field"><label>Nama posisi (opsional)</label><input name="position_title" placeholder="Contoh: Koordinator Kaderisasi"></div><div class="form-actions"><button class="btn" type="submit">Simpan penempatan</button></div></form>':'<div class="empty"><strong>Aktifkan periode terlebih dahulu</strong>Penempatan jabatan membutuhkan periode kepengurusan.</div>')+
     '</section></div><section class="panel"><div class="panel-head"><div><h3>Ringkasan akun disetujui</h3><p>'+approved.length+' akun aktif pada sistem.</p></div></div><div class="table-wrap"><table><thead><tr><th>Nama</th><th>NIM</th><th>Status</th></tr></thead><tbody>'+(approved.length?approved.map(p=>'<tr><td>'+esc(p.full_name)+'</td><td>'+esc(p.nim||"—")+'</td><td><span class="badge">Aktif</span></td></tr>').join(""):'<tr><td colspan="3" class="muted">Belum ada akun aktif.</td></tr>')+'</tbody></table></div></section></div>';
 }
+
+function renderAdminSettings(){
+  if(!isAdmin()) return renderOverview();
+  const s={...DEFAULT_SYSTEM_SETTINGS,...(state.systemSettings||{})};
+  const logs=state.auditLogs||[];
+  const logRows=logs.length?logs.map(log=>{
+    const actor=profileFor(log.actor_user_id)?.full_name||"Admin / sistem";
+    const stamp=log.created_at?new Date(log.created_at).toLocaleString("id-ID",{dateStyle:"medium",timeStyle:"short"}):"—";
+    return '<tr><td>'+esc(stamp)+'</td><td>'+esc(actor)+'</td><td>'+esc(log.action||"—")+'</td><td>'+esc(log.table_name||"—")+'</td></tr>';
+  }).join(""):'<tr><td colspan="4"><div class="empty compact-empty">Belum ada aktivitas yang tercatat.</div></td></tr>';
+  return pageHeading("Pengaturan sistem","Kelola keamanan akun admin, identitas aplikasi, dan preferensi tampilan SIGAP.")+
+    '<div class="settings-overview"><div><span class="eyebrow">AKUN ADMIN</span><strong>'+esc(state.profile?.full_name||"Administrator")+'</strong><small>'+esc(state.user?.email||"")+'</small></div><span class="badge success">Hak akses admin aktif</span></div>'+
+    '<div class="settings-grid">'+
+      '<section class="panel settings-panel"><div class="panel-head"><div><h3>Keamanan akun</h3><p>Ganti password akun admin yang sedang digunakan.</p></div><span class="settings-icon">⌑</span></div>'+
+        '<form id="admin-password-form">'+
+          '<div class="field"><label>Password saat ini</label><input name="current_password" type="password" autocomplete="current-password" required></div>'+
+          '<div class="field"><label>Password baru</label><input name="new_password" type="password" autocomplete="new-password" minlength="8" required placeholder="Minimal 8 karakter"></div>'+
+          '<div class="field"><label>Ulangi password baru</label><input name="confirm_password" type="password" autocomplete="new-password" minlength="8" required placeholder="Ketik ulang password baru"></div>'+
+          '<div class="notice">Password lama akan diverifikasi terlebih dahulu sebelum perubahan disimpan. Password tidak disimpan di tabel aplikasi.</div>'+
+          '<div class="form-actions"><button class="btn" type="submit">Perbarui password</button></div>'+
+        '</form>'+
+      '</section>'+
+      '<section class="panel settings-panel"><div class="panel-head"><div><h3>Identitas & tampilan</h3><p>Pengaturan ini berlaku untuk seluruh pengguna SIGAP.</p></div><span class="settings-icon">◈</span></div>'+
+        '<form id="system-settings-form">'+
+          '<div class="field"><label>Nama aplikasi</label><input name="app_name" maxlength="60" required value="'+esc(s.app_name)+'"></div>'+
+          '<div class="field"><label>Subjudul aplikasi</label><input name="app_subtitle" maxlength="100" required value="'+esc(s.app_subtitle)+'"></div>'+
+          '<div class="field"><label>Judul halaman masuk</label><textarea name="login_headline" rows="2" maxlength="100" required>'+esc(s.login_headline)+'</textarea></div>'+
+          '<div class="field"><label>Deskripsi halaman masuk</label><textarea name="login_description" rows="3" maxlength="300" required>'+esc(s.login_description)+'</textarea></div>'+
+          '<div class="field"><label>Tema warna</label><select name="theme_preset">'+
+            '<option value="navy_gold" '+(s.theme_preset==="navy_gold"?"selected":"")+'>Navy & Emas — identitas PMII</option>'+
+            '<option value="ocean_blue" '+(s.theme_preset==="ocean_blue"?"selected":"")+'>Biru Laut — formal</option>'+
+            '<option value="forest_green" '+(s.theme_preset==="forest_green"?"selected":"")+'>Hijau — klasik</option>'+
+          '</select></div>'+
+          '<label class="settings-check"><input type="checkbox" name="compact_mode" '+(s.compact_mode?"checked":"")+'> Gunakan tampilan ringkas (jarak dan panel lebih padat)</label>'+
+          '<div class="form-actions"><button class="btn" type="submit">Simpan kustomisasi</button></div>'+
+        '</form>'+
+      '</section>'+
+    '</div>'+
+    '<section class="panel settings-audit"><div class="panel-head"><div><h3>Riwayat aktivitas</h3><p>Catatan perubahan yang tersedia untuk admin.</p></div><button class="btn btn-ghost" type="button" data-refresh-audit>Segarkan</button></div>'+
+      '<div class="table-wrap"><table><thead><tr><th>Waktu</th><th>Pelaku</th><th>Aksi</th><th>Data</th></tr></thead><tbody>'+logRows+'</tbody></table></div>'+
+    '</section>';
+}
 function renderApprovals() {
   const pending=state.profiles.filter(p=>p.account_status==="pending");
   return pageHeading("Persetujuan akun","Tinjau pendaftaran anggota sebelum mereka dapat masuk dan menggunakan SIGAP.")+
@@ -692,10 +787,12 @@ function renderView() {
   if(state.view==="evaluations") return renderEvaluations();
   if(state.view==="reports") return renderReports();
   if(state.view==="admin" && isAdmin()) return renderAdmin();
+  if(state.view==="settings" && isAdmin()) return renderAdminSettings();
   return renderOverview();
 }
 function renderPublicStructure() {
   root.innerHTML='<div class="public-structure-shell"><header class="public-structure-top"><div class="public-structure-brand"><div class="brand-logo auth-logo"><img src="https://1.bp.blogspot.com/-_LPIjxug5bs/W1YpWUAw0FI/AAAAAAAAAac/26D9u4GoFe0qM9sdOUpfSyV0MH4RO1y0QCLcBGAs/s1600/logo_pmii_hd.png" alt="Lambang PMII"></div><div><strong>SIGAP PMII FEBI</strong><small>Direktori struktur kepengurusan</small></div></div><button class="btn btn-ghost" id="back-to-login">Masuk / Daftar</button></header><main class="public-structure-main">'+renderStructure()+'<p class="tiny muted">Direktori publik hanya memuat nama, jabatan, dan unit. Data penilaian dan evaluasi hanya tersedia bagi pengurus berwenang setelah masuk.</p></main></div>';
+  applySystemSettings();
 }
 function render() {
   if(!state.user) return state.publicMode?renderPublicStructure():renderAuth();
@@ -710,6 +807,46 @@ async function reload() {
 async function signOut() {
   try { if(state.session?.access_token) await authRequest("/logout",{method:"POST"},state.session.access_token); } catch(_){}
   saveSession(null); state.user=null; state.profile=null; state.publicMode=false; renderAuth();
+}
+
+async function changeAdminPassword(form){
+  if(!isAdmin()) throw new Error("Fitur ini hanya tersedia untuk admin sistem.");
+  const values=Object.fromEntries(new FormData(form).entries());
+  if(!state.user?.email) throw new Error("Email akun admin tidak ditemukan.");
+  if(values.new_password.length<8) throw new Error("Password baru minimal 8 karakter.");
+  if(values.new_password!==values.confirm_password) throw new Error("Konfirmasi password baru tidak sama.");
+  const verified=await authRequest("/token?grant_type=password",{
+    method:"POST",
+    body:JSON.stringify({email:state.user.email,password:values.current_password})
+  });
+  if(!verified.access_token) throw new Error("Verifikasi password lama gagal.");
+  await authRequest("/user",{
+    method:"PUT",
+    body:JSON.stringify({password:values.new_password})
+  },verified.access_token);
+  form.reset();
+  toast("Password admin berhasil diperbarui.");
+}
+async function saveSystemSettings(form){
+  if(!isAdmin()) throw new Error("Hanya admin sistem yang dapat mengubah kustomisasi.");
+  const values=Object.fromEntries(new FormData(form).entries());
+  const payload={
+    app_name:String(values.app_name||"").trim(),
+    app_subtitle:String(values.app_subtitle||"").trim(),
+    login_headline:String(values.login_headline||"").trim(),
+    login_description:String(values.login_description||"").trim(),
+    theme_preset:values.theme_preset,
+    compact_mode:!!form.elements.namedItem("compact_mode").checked,
+    updated_by:state.user.id,
+    updated_at:new Date().toISOString()
+  };
+  if(payload.app_name.length<3 || payload.app_subtitle.length<3 || payload.login_headline.length<3 || payload.login_description.length<3){
+    throw new Error("Lengkapi seluruh identitas dan deskripsi dengan minimal 3 karakter.");
+  }
+  await api("system_settings?id=eq.1",{method:"PATCH",body:JSON.stringify(payload)});
+  await loadSystemSettings();
+  renderShell();
+  toast("Kustomisasi SIGAP berhasil disimpan untuk seluruh pengguna.");
 }
 async function handleAuth(form) {
   const values=Object.fromEntries(new FormData(form).entries());
@@ -823,7 +960,21 @@ document.addEventListener("click",async event=>{
   }
   if(event.target.closest("#back-to-login")){state.publicMode=false;renderAuth();return;}
   const view=event.target.closest("[data-view]");
-  if(view){state.view=view.dataset.view;renderShell();return;}
+  if(view){
+    state.view=view.dataset.view;
+    renderShell();
+    if(state.view==="settings" && isAdmin()){
+      try{state.auditLogs=await api("audit_logs?select=*&order=created_at.desc&limit=20");renderShell();}
+      catch(e){toast("Riwayat aktivitas tidak dapat dimuat: "+e.message,true);}
+    }
+    return;
+  }
+  if(event.target.closest("[data-refresh-audit]")){
+    const control=event.target.closest("[data-refresh-audit]");control.disabled=true;
+    try{state.auditLogs=await api("audit_logs?select=*&order=created_at.desc&limit=20");renderShell();toast("Riwayat aktivitas diperbarui.");}
+    catch(e){toast(e.message,true);control.disabled=false;}
+    return;
+  }
   const mode=event.target.closest("[data-auth-mode]");
   if(mode){state.authMode=mode.dataset.authMode;renderAuth();return;}
   if(event.target.closest("#logout")){await signOut();return;}
@@ -928,6 +1079,8 @@ document.addEventListener("submit",async event=>{
   const form=event.target;
   const handlers={
     "auth-form":()=>handleAuth(form),
+    "admin-password-form":()=>changeAdminPassword(form),
+    "system-settings-form":()=>saveSystemSettings(form),
     "individual-evaluation-form":()=>submitEvaluation(form,"individual"),
     "bureau-evaluation-form":()=>submitEvaluation(form,"bureau"),
     "roster-form":()=>saveRoster(form),
@@ -944,6 +1097,7 @@ document.addEventListener("submit",async event=>{
 });
 async function init() {
   if(!API || !KEY){renderAuth();toast("Konfigurasi Supabase belum lengkap.",true);return;}
+  await loadSystemSettings();
   if(new URLSearchParams(window.location.search).has("struktur")){
     try{await loadPublicStructure();}
     catch(error){renderAuth();toast("Direktori struktur belum dapat dimuat: "+error.message,true);}
