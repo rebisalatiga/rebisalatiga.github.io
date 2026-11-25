@@ -837,7 +837,6 @@ async function saveSystemSettings(form){
     login_description:String(values.login_description||"").trim(),
     theme_preset:values.theme_preset,
     compact_mode:!!form.elements.namedItem("compact_mode").checked,
-    updated_by:state.user.id,
     updated_at:new Date().toISOString()
   };
   if(payload.app_name.length<3 || payload.app_subtitle.length<3 || payload.login_headline.length<3 || payload.login_description.length<3){
