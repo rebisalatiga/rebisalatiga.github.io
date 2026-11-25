@@ -1,5 +1,5 @@
 const CACHE_NAME = "sigap-app-shell-v20261125-01";
-const APP_SHELL = ["./","./index.html","./styles.css?v=pwa-20261125-01","./config.js","./pwa.js?v=pwa-20261125-01","./app.js?v=pwa-20261125-01","./manifest.webmanifest","./favicon.svg","./icons/app-192.png"];
+const APP_SHELL = ["./","./index.html","./styles.css?v=pwa-20261125-01","./config.js","./pwa.js?v=pwa-20261125-01","./app.js?v=pwa-20261125-01","./manifest.webmanifest","./favicon.svg","./icons/app-192.png","./icons/app-512.png"];
 self.addEventListener("install", event => {
   event.waitUntil((async () => { const cache = await caches.open(CACHE_NAME); await cache.addAll(APP_SHELL); await self.skipWaiting(); })());
 });
