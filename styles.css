@@ -675,3 +675,27 @@ body.compact-mode .dashboard-top{gap:10px}
  .settings-panel,.settings-audit{padding:13px}
  .settings-audit .panel-head{align-items:flex-start}
 }
+
+
+/* PWA install controls */
+.app-install-button{display:inline-flex;align-items:center;justify-content:center;gap:9px;min-height:42px;padding:10px 15px;border:1px solid rgba(242,197,0,.75);border-radius:9px;background:#f2c500;color:#111a3d;font-size:12px;font-weight:800;box-shadow:none;transition:background .16s,border-color .16s,transform .16s}
+.app-install-button:hover{background:#dfb700;border-color:#dfb700;transform:translateY(-1px)}
+.app-install-button:focus-visible{outline:3px solid #fff;outline-offset:3px}
+.app-install-button>span:first-child{font-size:17px;line-height:1}
+.app-install-button[hidden]{display:none!important}
+.auth-install-action{display:grid;justify-items:start;gap:7px;width:min(100%,430px);margin-top:-8px}
+.auth-install-action small{color:#c8d7e8;font-size:10px;line-height:1.5}
+.auth-install-button{background:transparent;color:#fff;border-color:rgba(255,255,255,.36);min-height:40px}
+.auth-install-button:hover{background:rgba(255,255,255,.11);border-color:#f2c500}
+.sidebar-install-button{width:100%;justify-content:flex-start;margin-bottom:14px;background:rgba(242,197,0,.12);border-color:rgba(242,197,0,.42);color:#ffe36a}
+.sidebar-install-button:hover{background:rgba(242,197,0,.2);border-color:#f2c500}
+.public-install-button{white-space:nowrap}
+.install-guide{width:min(100%,470px)}
+.install-guide-intro{font-size:13px;line-height:1.6;margin:14px 0}
+.install-guide-steps{padding-left:22px;margin:14px 0 18px;color:#273451;font-size:13px;line-height:1.7}
+.install-guide-steps li{padding-left:4px;margin:8px 0}
+.install-guide-steps strong{color:#152449}
+.install-guide-note{margin-bottom:16px}
+.install-guide-footer{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+@media(max-width:720px){.auth-install-action{width:min(100%,460px);margin-top:-4px}.public-install-button{margin-left:auto}}
+@media(max-width:520px){.app-install-button{min-height:38px;padding:9px 11px;font-size:10px}.public-install-button{font-size:10px}}

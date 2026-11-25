@@ -4,6 +4,9 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#111a3d">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="SIGAP PMII">
   <meta name="description" content="SIGAP PMII FEBI — Sistem Informasi Evaluasi dan Penilaian Kepengurusan.">
   <meta name="application-name" content="SIGAP PMII FEBI">
   <link rel="icon" type="image/svg+xml" href="./favicon.svg?v=pmii-20261124-03">
@@ -26,7 +29,9 @@
   <meta name="twitter:description" content="Sistem Informasi Evaluasi dan Penilaian Kepengurusan PMII FEBI.">
   <meta name="twitter:image" content="https://upload.wikimedia.org/wikipedia/commons/e/e2/PMII_Logo.png?v=pmii-20261124-03">
   <title>SIGAP PMII FEBI</title>
-  <link rel="stylesheet" href="./styles.css?v=admin-settings-20261125-01">
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="apple-touch-icon" sizes="192x192" href="./icons/app-192.png">
+  <link rel="stylesheet" href="./styles.css?v=pwa-20261125-01">
 </head>
 <body>
   <div id="app">
@@ -34,6 +39,7 @@
   </div>
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
   <script src="./config.js"></script>
-  <script type="module" src="./app.js?v=member-password-reset-20261125-01"></script>
+  <script src="./pwa.js?v=pwa-20261125-01"></script>
+  <script type="module" src="./app.js?v=pwa-20261125-01"></script>
 </body>
 </html>

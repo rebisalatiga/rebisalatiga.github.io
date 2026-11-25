@@ -19,4 +19,4 @@ jobs:
         with:
           node-version: 22
       - name: Check frontend JavaScript syntax
-        run: node --check app.js
+        run: node --check app.js && node --check pwa.js && node --check sw.js
