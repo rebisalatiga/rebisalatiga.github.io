@@ -104,10 +104,10 @@ function applySystemSettings(){
   Object.entries(variables).forEach(([name,value])=>html.style.setProperty(name,value));
   document.body.classList.toggle("compact-mode",!!settings.compact_mode);
   document.title=settings.app_name||DEFAULT_SYSTEM_SETTINGS.app_name;
-  $(".brand-lockup strong,.side-brand strong,.public-structure-brand strong").forEach(node=>{
+  $$(".brand-lockup strong,.side-brand strong,.public-structure-brand strong").forEach(node=>{
     node.textContent=settings.app_name||DEFAULT_SYSTEM_SETTINGS.app_name;
   });
-  $(".brand-lockup small").forEach(node=>{
+  $$(".brand-lockup small").forEach(node=>{
     node.textContent=settings.app_subtitle||DEFAULT_SYSTEM_SETTINGS.app_subtitle;
   });
   const heading=$(".hero-copy h1");
