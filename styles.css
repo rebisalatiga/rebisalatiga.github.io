@@ -632,3 +632,46 @@ button,input,select,textarea{max-width:100%}
 @media(max-width:380px){
   .auth-structure-button{min-height:44px;padding:0 13px}
 }
+
+
+/* Admin settings: account security, global appearance and audit history. */
+.settings-overview{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:15px 18px;margin:0 0 16px;background:#fff;border:1px solid var(--line);border-radius:12px}
+.settings-overview>div{display:grid;gap:4px;min-width:0}
+.settings-overview .eyebrow{font-size:9px}
+.settings-overview strong{font-size:14px;color:#17264a}
+.settings-overview small{font-size:11px;color:var(--muted);overflow-wrap:anywhere}
+.settings-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;align-items:start}
+.settings-panel{min-width:0}
+.settings-panel .panel-head{align-items:flex-start}
+.settings-icon{width:34px;height:34px;flex:0 0 34px;display:grid;place-items:center;border-radius:9px;background:var(--green-100);color:var(--green-800);font-size:19px}
+.settings-panel .field textarea{min-height:74px}
+.settings-check{display:flex;align-items:flex-start;gap:9px;margin-top:14px;color:#53617b;font-size:11px;line-height:1.5}
+.settings-check input{margin-top:2px;accent-color:var(--green-800)}
+.settings-audit{margin-top:16px}
+.settings-audit .table-wrap table{min-width:550px}
+.settings-audit td{font-size:11px}
+.settings-audit th{font-size:9px}
+body.compact-mode .page{padding-top:20px;padding-bottom:32px}
+body.compact-mode .panel{padding:14px}
+body.compact-mode .stat-card,body.compact-mode .eval-card,body.compact-mode .report-card{padding:12px}
+body.compact-mode .dashboard-middle{gap:10px}
+body.compact-mode .dashboard-top{gap:10px}
+:root[data-sigap-theme="ocean_blue"] .auth-hero{background:radial-gradient(circle at 76% 21%,rgba(105,183,232,.15),transparent 27%),linear-gradient(145deg,#10243d,#1b4168)}
+:root[data-sigap-theme="ocean_blue"] .sidebar{background:linear-gradient(180deg,#10243d 0%,#0d1f35 100%)}
+:root[data-sigap-theme="ocean_blue"] .metric-card{background:linear-gradient(145deg,#173b5c,#22517a)}
+:root[data-sigap-theme="ocean_blue"] .auth-structure-button{background:#69b7e8;border-color:#69b7e8;color:#10243d}
+:root[data-sigap-theme="ocean_blue"] .auth-structure-arrow{color:#10243d}
+:root[data-sigap-theme="ocean_blue"] .metric-card>strong{color:#bfe7ff}
+:root[data-sigap-theme="ocean_blue"] .metric-icon{background:#69b7e8;color:#10243d}
+:root[data-sigap-theme="forest_green"] .auth-hero{background:radial-gradient(circle at 76% 21%,rgba(214,173,85,.15),transparent 27%),linear-gradient(145deg,#12362c,#1d5139)}
+:root[data-sigap-theme="forest_green"] .sidebar{background:linear-gradient(180deg,#12362c 0%,#0e2d24 100%)}
+:root[data-sigap-theme="forest_green"] .metric-card{background:linear-gradient(145deg,#1d5139,#276548)}
+:root[data-sigap-theme="forest_green"] .auth-structure-button{background:#d6ad55;border-color:#d6ad55;color:#12362c}
+:root[data-sigap-theme="forest_green"] .metric-card>strong{color:#f5deb0}
+:root[data-sigap-theme="forest_green"] .metric-icon{background:#d6ad55;color:#12362c}
+@media(max-width:900px){.settings-grid{grid-template-columns:1fr}}
+@media(max-width:560px){
+ .settings-overview{align-items:flex-start;flex-direction:column;padding:13px}
+ .settings-panel,.settings-audit{padding:13px}
+ .settings-audit .panel-head{align-items:flex-start}
+}
