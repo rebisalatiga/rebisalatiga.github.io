@@ -14,7 +14,6 @@ create table if not exists public.system_settings (
   theme_preset text not null default 'navy_gold'
     check (theme_preset in ('navy_gold','ocean_blue','forest_green')),
   compact_mode boolean not null default false,
-  updated_by uuid references auth.users(id) on delete set null,
   updated_at timestamptz not null default now()
 );
 
