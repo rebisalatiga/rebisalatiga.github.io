@@ -735,22 +735,35 @@ function renderAdminSettings(){
   if(!isAdmin()) return renderOverview();
   const s={...DEFAULT_SYSTEM_SETTINGS,...(state.systemSettings||{})};
   const logs=state.auditLogs||[];
+  const resettableIds=new Set(state.memberships
+    .filter(m=>m.status==="active" && m.role!=="admin")
+    .map(m=>m.user_id));
+  const resettableProfiles=state.profiles
+    .filter(p=>p.account_status==="active" && p.id!==state.user?.id && resettableIds.has(p.id))
+    .sort((a,b)=>(a.full_name||"").localeCompare(b.full_name||"","id"));
+  const resetOptions=resettableProfiles.map(p=>{
+    const membership=state.memberships.find(m=>m.user_id===p.id && m.status==="active" && m.role!=="admin");
+    const role=membership?(membership.position_title||roleLabels[membership.role]||membership.role):"Pengurus";
+    return '<option value="'+p.id+'">'+esc(p.full_name||"Pengurus")+' · '+esc(role)+(p.nim?' · '+esc(p.nim):"")+'</option>';
+  }).join("");
   const logRows=logs.length?logs.map(log=>{
     const actor=profileFor(log.actor_user_id)?.full_name||"Admin / sistem";
     const stamp=log.created_at?new Date(log.created_at).toLocaleString("id-ID",{dateStyle:"medium",timeStyle:"short"}):"—";
     return '<tr><td>'+esc(stamp)+'</td><td>'+esc(actor)+'</td><td>'+esc(log.action||"—")+'</td><td>'+esc(log.table_name||"—")+'</td></tr>';
   }).join(""):'<tr><td colspan="4"><div class="empty compact-empty">Belum ada aktivitas yang tercatat.</div></td></tr>';
-  return pageHeading("Pengaturan sistem","Kelola keamanan akun admin, identitas aplikasi, dan preferensi tampilan SIGAP.")+
+  return pageHeading("Pengaturan sistem","Kelola password akun anggota, identitas aplikasi, dan preferensi tampilan SIGAP.")+
     '<div class="settings-overview"><div><span class="eyebrow">AKUN ADMIN</span><strong>'+esc(state.profile?.full_name||"Administrator")+'</strong><small>'+esc(state.user?.email||"")+'</small></div><span class="badge success">Hak akses admin aktif</span></div>'+
     '<div class="settings-grid">'+
-      '<section class="panel settings-panel"><div class="panel-head"><div><h3>Keamanan akun</h3><p>Ganti password akun admin yang sedang digunakan.</p></div><span class="settings-icon">⌑</span></div>'+
-        '<form id="admin-password-form">'+
-          '<div class="field"><label>Password saat ini</label><input name="current_password" type="password" autocomplete="current-password" required></div>'+
-          '<div class="field"><label>Password baru</label><input name="new_password" type="password" autocomplete="new-password" minlength="8" required placeholder="Minimal 8 karakter"></div>'+
-          '<div class="field"><label>Ulangi password baru</label><input name="confirm_password" type="password" autocomplete="new-password" minlength="8" required placeholder="Ketik ulang password baru"></div>'+
-          '<div class="notice">Password lama akan diverifikasi terlebih dahulu sebelum perubahan disimpan. Password tidak disimpan di tabel aplikasi.</div>'+
-          '<div class="form-actions"><button class="btn" type="submit">Perbarui password</button></div>'+
-        '</form>'+
+      '<section class="panel settings-panel"><div class="panel-head"><div><h3>Reset password anggota</h3><p>'+resettableProfiles.length+' akun anggota aktif tersedia untuk diatur ulang.</p></div><span class="settings-icon">⌑</span></div>'+
+        (resettableProfiles.length?
+          '<form id="admin-reset-member-password-form">'+
+            '<div class="field"><label>Pilih akun anggota</label><select name="target_user_id" required><option value="">Pilih anggota</option>'+resetOptions+'</select></div>'+
+            '<div class="field"><label>Password baru</label><input name="new_password" type="password" autocomplete="new-password" minlength="8" maxlength="72" required placeholder="Minimal 8 karakter"></div>'+
+            '<div class="field"><label>Ulangi password baru</label><input name="confirm_password" type="password" autocomplete="new-password" minlength="8" maxlength="72" required placeholder="Ketik ulang password baru"></div>'+
+            '<div class="notice">Password lama anggota akan langsung diganti. Sampaikan password sementara ini secara pribadi kepada pemilik akun, lalu anjurkan untuk menggantinya setelah masuk.</div>'+
+            '<div class="form-actions"><button class="btn" type="submit">Reset password anggota</button></div>'+
+          '</form>'
+          :'<div class="empty"><strong>Belum ada akun anggota aktif</strong>Akun anggota yang sudah disetujui dan memiliki penempatan aktif akan muncul di sini.</div>')+
       '</section>'+
       '<section class="panel settings-panel"><div class="panel-head"><div><h3>Identitas & tampilan</h3><p>Pengaturan ini berlaku untuk seluruh pengguna SIGAP.</p></div><span class="settings-icon">◈</span></div>'+
         '<form id="system-settings-form">'+
@@ -772,6 +785,7 @@ function renderAdminSettings(){
       '<div class="table-wrap"><table><thead><tr><th>Waktu</th><th>Pelaku</th><th>Aksi</th><th>Data</th></tr></thead><tbody>'+logRows+'</tbody></table></div>'+
     '</section>';
 }
+
 function renderApprovals() {
   const pending=state.profiles.filter(p=>p.account_status==="pending");
   return pageHeading("Persetujuan akun","Tinjau pendaftaran anggota sebelum mereka dapat masuk dan menggunakan SIGAP.")+
@@ -809,24 +823,35 @@ async function signOut() {
   saveSession(null); state.user=null; state.profile=null; state.publicMode=false; renderAuth();
 }
 
-async function changeAdminPassword(form){
-  if(!isAdmin()) throw new Error("Fitur ini hanya tersedia untuk admin sistem.");
+async function resetMemberPassword(form){
+  if(!isAdmin()) throw new Error("Hanya Admin Sistem yang dapat mereset password anggota.");
   const values=Object.fromEntries(new FormData(form).entries());
-  if(!state.user?.email) throw new Error("Email akun admin tidak ditemukan.");
-  if(values.new_password.length<8) throw new Error("Password baru minimal 8 karakter.");
-  if(values.new_password!==values.confirm_password) throw new Error("Konfirmasi password baru tidak sama.");
-  const verified=await authRequest("/token?grant_type=password",{
+  const target=state.profiles.find(p=>p.id===values.target_user_id);
+  const hasActiveMembership=state.memberships.some(m=>m.user_id===values.target_user_id && m.status==="active" && m.role!=="admin");
+  if(!target || target.account_status!=="active" || !hasActiveMembership || target.id===state.user?.id){
+    throw new Error("Akun anggota tidak valid, tidak aktif, atau bukan akun anggota lain.");
+  }
+  if(values.new_password.length<8 || values.new_password.length>72){
+    throw new Error("Password baru harus terdiri dari 8 sampai 72 karakter.");
+  }
+  if(values.new_password!==values.confirm_password){
+    throw new Error("Konfirmasi password baru tidak sama.");
+  }
+  const response=await fetch(API+"/functions/v1/admin-reset-password",{
     method:"POST",
-    body:JSON.stringify({email:state.user.email,password:values.current_password})
+    headers:{
+      "apikey":KEY,
+      "Authorization":"Bearer "+(state.session?.access_token||""),
+      "Content-Type":"application/json"
+    },
+    body:JSON.stringify({target_user_id:target.id,new_password:values.new_password})
   });
-  if(!verified.access_token) throw new Error("Verifikasi password lama gagal.");
-  await authRequest("/user",{
-    method:"PUT",
-    body:JSON.stringify({password:values.new_password})
-  },verified.access_token);
+  const payload=await response.json().catch(()=>({}));
+  if(!response.ok) throw new Error(payload.error||payload.message||"Password anggota gagal diperbarui.");
   form.reset();
-  toast("Password admin berhasil diperbarui.");
+  toast("Password akun "+(target.full_name||"anggota")+" berhasil direset. Sampaikan password baru secara pribadi.");
 }
+
 async function saveSystemSettings(form){
   if(!isAdmin()) throw new Error("Hanya admin sistem yang dapat mengubah kustomisasi.");
   const values=Object.fromEntries(new FormData(form).entries());
@@ -1078,7 +1103,7 @@ document.addEventListener("submit",async event=>{
   const form=event.target;
   const handlers={
     "auth-form":()=>handleAuth(form),
-    "admin-password-form":()=>changeAdminPassword(form),
+    "admin-reset-member-password-form":()=>resetMemberPassword(form),
     "system-settings-form":()=>saveSystemSettings(form),
     "individual-evaluation-form":()=>submitEvaluation(form,"individual"),
     "bureau-evaluation-form":()=>submitEvaluation(form,"bureau"),
