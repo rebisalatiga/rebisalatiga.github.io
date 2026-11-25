@@ -736,11 +736,8 @@ function renderAdminSettings(){
   if(!isAdmin()) return renderOverview();
   const s={...DEFAULT_SYSTEM_SETTINGS,...(state.systemSettings||{})};
   const logs=state.auditLogs||[];
-  const resettableIds=new Set(state.memberships
-    .filter(m=>m.status==="active" && m.role!=="admin")
-    .map(m=>m.user_id));
-  const resettableProfiles=state.profiles
-    .filter(p=>p.account_status==="active" && p.id!==state.user?.id && resettableIds.has(p.id))
+  const resettableProfiles=(state.adminAccounts||[])
+    .filter(p=>p.id!==state.user?.id)
     .sort((a,b)=>(a.full_name||"").localeCompare(b.full_name||"","id"));
   const resetOptions=resettableProfiles.map(p=>{
     const membership=state.memberships.find(m=>m.user_id===p.id && m.status==="active" && m.role!=="admin");
@@ -761,7 +758,7 @@ function renderAdminSettings(){
       const roleOptions=Object.entries(roleLabels).map(([key,label])=>'<option value="'+key+'" '+(membership?.role===key?'selected':'')+'>'+esc(label)+'</option>').join("");
       const membershipOptions=(account.memberships||[]).map(m=>'<option value="'+m.id+'" '+(membership?.id===m.id?'selected':'')+'>'+esc(m.position_title||roleLabels[m.role]||m.role)+' · '+esc(m.status)+'</option>').join("");
       return '<details class="account-management-item"><summary><span><strong>'+esc(account.full_name||"Tanpa nama")+'</strong><small>'+esc(account.email||"Email tidak tersedia")+' · '+esc(account.nim||"Tanpa NIM")+'</small></span><span class="badge '+(account.account_status==="active"?"success":"gold")+'">'+esc(account.account_status)+'</span></summary>'+
-        '<form class="account-edit-form" data-account-id="'+account.id+'"><input type="hidden" name="target_user_id" value="'+account.id+'">'+
+        '<form id="account-edit-form" class="account-edit-form" data-account-id="'+account.id+'"><input type="hidden" name="target_user_id" value="'+account.id+'">'+
         '<div class="account-edit-grid">'+
         '<div class="field"><label>Email login</label><input type="email" name="email" required value="'+esc(account.email||"")+'"></div>'+
         '<div class="field"><label>Nama lengkap</label><input name="full_name" required maxlength="120" value="'+esc(account.full_name||"")+'"></div>'+
